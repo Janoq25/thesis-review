@@ -66,6 +66,7 @@ export class FineTuningService {
     const pair = await this.prisma.fineTuningPair.create({
       data: {
         findingId: params.findingId,
+        analysisId: finding.analysisId,
         originalOutput,
         humanCorrection,
         outcomeType: params.outcome,

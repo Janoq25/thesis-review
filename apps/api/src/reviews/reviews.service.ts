@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationService } from '../notifications/notification.service';
+import { NotificationService } from '../notifications/notifications.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 interface AnnotationDto {
@@ -38,7 +38,7 @@ export class ReviewsService {
 
     const references = await this.prisma.referenceAnalysis.findUnique({
       where: { advanceId },
-      include: { references: { where: { status: { not: 'VERIFIED' } } } },
+      include: { references: { where: { verified: false } } },
     });
 
     return { advance, plagiarism, references };
@@ -102,29 +102,33 @@ export class ReviewsService {
     reviewerId: string;
     annotation: AnnotationDto;
   }) {
+    // Get or create the review for this advance
+    const review = await this.prisma.review.findFirst({
+      where: { advanceId: params.advanceId },
+    });
+    if (!review) {
+      throw new BadRequestException('No existe una revisión para este avance');
+    }
     return this.prisma.reviewAnnotation.create({
       data: {
-        advanceId: params.advanceId,
-        reviewerId: params.reviewerId,
+        reviewId: review.id,
+        content: params.annotation.text,
         pageNumber: params.annotation.pageNumber,
-        paragraph: params.annotation.paragraph,
-        text: params.annotation.text,
-        type: params.annotation.type,
       },
     });
   }
 
   async getAnnotations(advanceId: string) {
     return this.prisma.reviewAnnotation.findMany({
-      where: { advanceId },
-      include: { reviewer: { select: { name: true } } },
+      where: { review: { advanceId } },
+      include: { review: { include: { reviewer: { select: { name: true } } } } },
       orderBy: [{ pageNumber: 'asc' }, { createdAt: 'asc' }],
     });
   }
 
   async deleteAnnotation(id: string, reviewerId: string) {
-    const ann = await this.prisma.reviewAnnotation.findUniqueOrThrow({ where: { id } });
-    if (ann.reviewerId !== reviewerId) {
+    const ann = await this.prisma.reviewAnnotation.findUniqueOrThrow({ where: { id }, include: { review: true } });
+    if (ann.review.reviewerId !== reviewerId) {
       throw new BadRequestException('Solo el autor puede eliminar esta anotación');
     }
     return this.prisma.reviewAnnotation.delete({ where: { id } });

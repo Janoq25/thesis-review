@@ -7,7 +7,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
-import { NotificationService } from '../notifications/notification.service';
+import { NotificationService } from '../notifications/notifications.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 const ALLOWED_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];

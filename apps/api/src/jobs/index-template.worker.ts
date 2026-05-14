@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { OpenAIEmbeddings } from '@langchain/openai';
-import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 
 let prisma: PrismaService;
 let embeddings: OpenAIEmbeddings;
@@ -20,7 +20,7 @@ let splitter: RecursiveCharacterTextSplitter;
 })();
 
 export const indexTemplateWorker = new Worker(
-  'ai-analysis', // mismo queue, discriminar por nombre del job
+  'ai-analysis',
   async (job: Job) => {
     if (job.name !== 'index-template') return;
 
@@ -41,5 +41,5 @@ export const indexTemplateWorker = new Worker(
 
     return { templateId, chunksIndexed: chunks.length };
   },
-  { connection: { host: process.env.REDIS_HOST, port: 6379 }, concurrency: 2 },
+  { connection: { host: process.env.REDIS_HOST || 'localhost', port: 6379 }, concurrency: 2 },
 );

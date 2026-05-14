@@ -1,1 +1,4 @@
-// TODO: Implementar references\references.module.ts
+import { Module } from '@nestjs/common';
+@Module({})
+export class ReferencesModule {}
+

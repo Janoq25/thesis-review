@@ -46,7 +46,6 @@ export class AuditService {
   async getEntityHistory(entity: string, entityId: string) {
     return this.prisma.auditLog.findMany({
       where: { entity, entityId },
-      include: { user: { select: { id: true, name: true, role: true } } } as any,
       orderBy: { createdAt: 'desc' },
     });
   }

@@ -2,7 +2,7 @@ import {
   Controller, Get, Post, Param, Body, Query,
   UseGuards, Res, StreamableFile, HttpCode, HttpStatus,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { PdfReportService } from './pdf-report.service';
 import { EmailService } from './email.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';

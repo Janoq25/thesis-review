@@ -19,7 +19,7 @@ export class PushTokensController {
         token: body.token,
         platform: body.platform,
       },
-      update: { userId: req.user.id, updatedAt: new Date() },
+      update: { userId: req.user.id },
     });
   }
 

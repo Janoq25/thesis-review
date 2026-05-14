@@ -30,10 +30,7 @@ export class OrcidController {
   @Roles('ADVISOR', 'COORDINATOR', 'ADMIN')
   getProfile(@Param('userId') userId: string) {
     return this.orcidService['prisma'].orcidProfile.findUnique({
-      where: { userId },
-      include: {
-        publications: { orderBy: { year: 'desc' }, take: 20 },
-      },
+      where: { userId }
     });
   }
 
@@ -67,7 +64,7 @@ export class OrcidController {
   async getAdvisorsRanking(@Query('advanceId') advanceId: string) {
     const advisors = await this.orcidService['prisma'].user.findMany({
       where: { role: 'ADVISOR', orcidProfile: { isNot: null } },
-      include: { orcidProfile: { select: { keywords: true, displayName: true } } },
+      include: { orcidProfile: { select: { name: true } } },
     });
 
     const chunks = await this.orcidService['prisma'].advanceChunk.findMany({
@@ -86,7 +83,7 @@ export class OrcidController {
         return {
           advisorId: advisor.id,
           name: advisor.name,
-          orcidKeywords: advisor.orcidProfile?.keywords ?? [],
+          orcidKeywords: [],
           score,
           matchedKeywords,
         };

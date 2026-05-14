@@ -34,11 +34,6 @@ export class PlagiarismController {
       where: { advanceId },
       include: {
         alerts: {
-          include: {
-            targetAdvance: {
-              select: { id: true, title: true, student: { select: { name: true } } },
-            },
-          },
           orderBy: { similarity: 'desc' },
         },
       },
@@ -57,7 +52,7 @@ export class PlagiarismController {
   getProgramAlerts(@Param('programId') programId: string) {
     return this.plagiarismService['prisma'].plagiarismAlert.findMany({
       where: {
-        severity: { in: ['critical', 'warning'] },
+        similarity: { gte: 0.70 },
         report: { advance: { programId } },
       },
       include: {
@@ -66,7 +61,6 @@ export class PlagiarismController {
             advance: { select: { title: true, student: { select: { name: true } } } },
           },
         },
-        targetAdvance: { select: { title: true, student: { select: { name: true } } } },
       },
       orderBy: { similarity: 'desc' },
       take: 50,

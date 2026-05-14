@@ -20,7 +20,7 @@ export class TemplatesService {
       apiKey: process.env.OPENAI_API_KEY,
       model: 'gpt-4o',
       temperature: 0,
-      responseFormat: { type: 'json_object' },
+      modelKwargs: { response_format: { type: 'json_object' } },
     });
   }
 

@@ -63,6 +63,7 @@ model User {
   refreshTokens RefreshToken[]
   pushTokens   UserPushToken[]
   orcidProfile OrcidProfile?
+  passwordResetToken PasswordResetToken?
   createdAt    DateTime  @default(now())
 }
 
@@ -194,16 +195,34 @@ model AIFinding {
   createdAt         DateTime        @default(now())
 }
 
+model FineTuningDataset {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  status      String   @default("PENDING") // PENDING, TRAINING, COMPLETED, FAILED
+  pairCount   Int      @default(0)
+  jobId       String?
+  modelId     String?
+  pairs       FineTuningPair[]
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+}
+
 model FineTuningPair {
-  id           String     @id @default(cuid())
-  analysisId   String
-  analysis     AIAnalysis @relation(fields: [analysisId], references: [id])
-  findingId    String
-  finding      AIFinding  @relation(fields: [findingId], references: [id])
-  originalOutput String
-  humanCorrection String
-  datasetId    String?
-  createdAt    DateTime   @default(now())
+  id              String      @id @default(cuid())
+  analysisId      String
+  analysis        AIAnalysis  @relation(fields: [analysisId], references: [id])
+  findingId       String
+  finding         AIFinding   @relation(fields: [findingId], references: [id])
+  originalOutput  Json
+  humanCorrection Json
+  outcomeType     String
+  reviewerId      String
+  advanceType     String
+  programId       String
+  datasetId       String?
+  dataset         FineTuningDataset? @relation(fields: [datasetId], references: [id])
+  createdAt       DateTime    @default(now())
 
   @@index([datasetId, createdAt])
 }

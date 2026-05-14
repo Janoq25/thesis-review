@@ -127,21 +127,42 @@ Responde con este JSON exacto:
   ]
 }`;
 
-    const response = await this.llm.invoke([
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: userPrompt },
-    ]);
+    // MOCK: Simular latencia de red de OpenAI
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    const parsed = JSON.parse(response.content as string);
-    const s = parsed.scores;
+    const s = {
+      structure: 85,
+      content: 70,
+      form: 90,
+      originality: 80,
+    };
     const overall = s.structure * 0.3 + s.content * 0.4 + s.form * 0.2 + s.originality * 0.1;
     const grade = (overall / 100) * this.config.maxGrade;
 
     return {
       scores: { ...s, overall: Math.round(overall * 10) / 10 },
       grade: Math.round(grade * 10) / 10,
-      executiveSummary: parsed.executiveSummary,
-      findings: parsed.findings,
+      executiveSummary: "El documento presenta una estructura adecuada y cumple con la mayoría de los requerimientos formales. Sin embargo, el contenido de la metodología carece de profundidad y la argumentación en la discusión de resultados debe fortalecerse. Se recomienda revisar exhaustivamente las fuentes citadas.",
+      findings: [
+        {
+          sectionRef: "Metodología",
+          pageRef: 12,
+          severity: "MAJOR",
+          description: "La justificación del diseño de investigación es insuficiente.",
+          correctionSteps: "1. Describir el diseño cualitativo o cuantitativo. 2. Justificar por qué se eligió. 3. Referenciar autores metodológicos.",
+          exampleImprovement: "El presente estudio utiliza un diseño preexperimental de corte transversal, justificado por (Autor, Año) ya que permite...",
+          recommendation: "Consultar manuales de metodología como Sampieri."
+        },
+        {
+          sectionRef: "Conclusiones",
+          pageRef: 25,
+          severity: "MINOR",
+          description: "Las conclusiones no responden directamente a la pregunta de investigación secundaria.",
+          correctionSteps: "1. Revisar los objetivos planteados. 2. Redactar una conclusión por cada objetivo.",
+          exampleImprovement: "En respuesta al segundo objetivo específico, se concluye que...",
+          recommendation: "Asegurar alineación entre Introducción y Conclusiones."
+        }
+      ],
       processingMs: Date.now() - startMs,
     };
   }

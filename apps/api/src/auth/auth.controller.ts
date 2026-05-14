@@ -12,7 +12,10 @@ import { Ip, Headers } from '@nestjs/common';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private refreshTokenService: RefreshTokenService,
+  ) {}
 
   @Post('login')
   @UseGuards(LocalAuthGuard)

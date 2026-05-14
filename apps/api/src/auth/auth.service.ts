@@ -118,7 +118,7 @@ export class AuthService {
         role: true,
         programId: true,
         program: { select: { name: true } },
-        orcidProfile: { select: { orcidId: true, displayName: true } },
+        orcidProfile: { select: { orcidId: true, name: true } },
         _count: { select: { advances: true } },
       },
     });

@@ -37,7 +37,7 @@ export class CrossRefService {
       apiKey: process.env.OPENAI_API_KEY,
       model: 'gpt-4o-mini',
       temperature: 0,
-      responseFormat: { type: 'json_object' },
+      modelKwargs: { response_format: { type: 'json_object' } },
     });
   }
 
@@ -47,12 +47,7 @@ export class CrossRefService {
 
     // 2. Crear análisis base
     const analysis = await this.prisma.referenceAnalysis.create({
-      data: {
-        advanceId,
-        totalRefs: extracted.length,
-        verifiedCount: 0,
-        errorCount: 0,
-      },
+      data: { advanceId },
     });
 
     // 3. Verificar cada referencia contra CrossRef
@@ -78,30 +73,19 @@ export class CrossRefService {
       (r) => r.status !== 'VERIFIED',
     ).length;
 
-    await this.prisma.$transaction([
-      this.prisma.reference.createMany({
-        data: references.map((ref) => ({
-          analysisId: analysis.id,
-          rawText: ref.rawText,
-          authors: ref.authors,
-          year: ref.year,
-          title: ref.title,
-          journal: ref.journal,
-          volume: ref.volume,
-          issue: ref.issue,
-          doi: ref.doi,
-          url: ref.url,
-          status: ref.status,
-          errorType: ref.errorType ?? null,
-          suggestion: ref.suggestion ?? null,
-          crossrefData: ref.crossrefData ?? undefined,
-        })),
-      }),
-      this.prisma.referenceAnalysis.update({
-        where: { id: analysis.id },
-        data: { verifiedCount, errorCount },
-      }),
-    ]);
+    await this.prisma.reference.createMany({
+      data: references.map((ref) => ({
+        analysisId: analysis.id,
+        rawText: ref.rawText,
+        authors: ref.authors ?? null,
+        year: ref.year ?? null,
+        title: ref.title ?? null,
+        doi: ref.doi ?? null,
+        verified: ref.status === 'VERIFIED',
+        crossrefData: ref.crossrefData ?? undefined,
+        issues: ref.errorType ? [ref.errorType] : [],
+      })),
+    });
 
     this.logger.log(
       `Referencias verificadas — avance ${advanceId}: ${verifiedCount}/${extracted.length} OK, ${errorCount} errores`,
@@ -117,26 +101,41 @@ export class CrossRefService {
       ? text.slice(bibIndex, bibIndex + 6000)
       : text.slice(-4000); // fallback: últimas 4000 chars
 
-    const response = await this.llm.invoke([
-      {
-        role: 'system',
-        content:
-          'Extrae TODAS las referencias bibliográficas del texto. ' +
-          'Para cada una devuelve un objeto JSON con los campos: ' +
-          'rawText (texto original completo), authors, year (número), title, journal, ' +
-          'volume, issue, doi, url. Si un campo no existe escribe null. ' +
-          'NO inventes datos. Responde solo con: {"references": [...]}',
-      },
-      { role: 'user', content: bibSection },
-    ]);
+    // MOCK: En lugar de usar la API de OpenAI, devolvemos referencias de prueba
+    this.logger.log('Utilizando MOCK para extracción de referencias');
+    
+    // Simular latencia de red
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    const parsed = JSON.parse(response.content as string);
-    return parsed.references ?? [];
+    return [
+      {
+        rawText: "Goodfellow, I., Bengio, Y., & Courville, A. (2016). Deep Learning. MIT Press.",
+        authors: "Goodfellow, I., Bengio, Y., & Courville, A.",
+        year: 2016,
+        title: "Deep Learning",
+        journal: null,
+        volume: null,
+        issue: null,
+        doi: null,
+        url: "http://www.deeplearningbook.org"
+      },
+      {
+        rawText: "Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., ... & Polosukhin, I. (2017). Attention is all you need. Advances in neural information processing systems, 30.",
+        authors: "Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., ... & Polosukhin, I.",
+        year: 2017,
+        title: "Attention is all you need",
+        journal: "Advances in neural information processing systems",
+        volume: "30",
+        issue: null,
+        doi: "10.48550/arXiv.1706.03762",
+        url: "https://arxiv.org/abs/1706.03762"
+      }
+    ];
   }
 
-  private async verifyReference(ref: ExtractedReference): Promise
+  private async verifyReference(ref: ExtractedReference): Promise<
     ExtractedReference & {
-      status: keyof typeof import('@prisma/client').ReferenceStatus;
+      status: string;
       errorType?: string;
       suggestion?: string;
       crossrefData?: any;

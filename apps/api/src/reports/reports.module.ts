@@ -1,1 +1,4 @@
-// TODO: Implementar reports\reports.module.ts
+import { Module } from '@nestjs/common';
+@Module({})
+export class ReportsModule {}
+

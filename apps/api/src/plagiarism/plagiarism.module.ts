@@ -1,1 +1,4 @@
-// TODO: Implementar plagiarism\plagiarism.module.ts
+import { Module } from '@nestjs/common';
+@Module({})
+export class PlagiarismModule {}
+

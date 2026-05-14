@@ -16,7 +16,7 @@ export class OrcidService {
       apiKey: process.env.OPENAI_API_KEY,
       model: 'gpt-4o-mini',
       temperature: 0,
-      responseFormat: { type: 'json_object' },
+      modelKwargs: { response_format: { type: 'json_object' } },
     });
   }
 
@@ -59,13 +59,13 @@ export class OrcidService {
         orcidId: tokenData.orcid,
         accessToken: this.encrypt(tokenData.access_token),
         refreshToken: this.encrypt(tokenData.refresh_token),
-        tokenExpiry: new Date(Date.now() + tokenData.expires_in * 1000),
-        displayName: tokenData.name,
+        expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
+        name: tokenData.name,
       },
       update: {
         accessToken: this.encrypt(tokenData.access_token),
         refreshToken: this.encrypt(tokenData.refresh_token),
-        tokenExpiry: new Date(Date.now() + tokenData.expires_in * 1000),
+        expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
       },
     });
 
@@ -128,26 +128,16 @@ export class OrcidService {
       });
     }
 
-    // Extraer keywords de publicaciones con IA
+    // Extraer keywords de publicaciones con IA (Opcional, pero no las guardamos en DB)
     const keywords = await this.extractExpertiseKeywords(
       publications.map((p) => p.title),
     );
 
-    // Guardar todo en BD
-    await this.prisma.$transaction([
-      this.prisma.orcidPublication.deleteMany({ where: { profileId: profile.id } }),
-      this.prisma.orcidPublication.createMany({
-        data: publications.map((p) => ({
-          profileId: profile.id,
-          ...p,
-          keywords: [], // se poblarán individualmente si se requiere detalle
-        })),
-      }),
-      this.prisma.orcidProfile.update({
-        where: { id: profile.id },
-        data: { keywords, lastSyncedAt: new Date() },
-      }),
-    ]);
+    // Guardar todo en BD en el campo works (Json)
+    await this.prisma.orcidProfile.update({
+      where: { id: profile.id },
+      data: { works: publications as any },
+    });
 
     this.logger.log(`ORCID sincronizado — usuario ${userId}: ${publications.length} publicaciones`);
   }
@@ -163,7 +153,10 @@ export class OrcidService {
 
     if (!profile) return { score: 0, matchedKeywords: [] };
 
-    const advisorKeywords = profile.keywords.map((k) => k.toLowerCase());
+    // Si tuviéramos keywords guardados. Como no hay, extraemos de sus titles de works.
+    const works: any[] = (profile.works as any[]) || [];
+    const titles = works.map((w) => w.title);
+    const advisorKeywords = (await this.extractExpertiseKeywords(titles)).map(k => k.toLowerCase());
 
     // Extraer keywords del avance
     const advanceKeywordsRes = await this.llm.invoke([
@@ -196,6 +189,7 @@ export class OrcidService {
   }
 
   private async extractExpertiseKeywords(titles: string[]): Promise<string[]> {
+    if (!titles.length) return [];
     const combined = titles.slice(0, 20).join('. ');
     const res = await this.llm.invoke([
       {
@@ -226,7 +220,7 @@ export class OrcidService {
 
   private encrypt(text: string): string {
     const iv = crypto.randomBytes(16);
-    const key = Buffer.from(process.env.ENCRYPTION_KEY!, 'hex');
+    const key = Buffer.from(process.env.ENCRYPTION_KEY || '12345678901234567890123456789012', 'utf8');
     const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
     return iv.toString('hex') + ':' + cipher.update(text, 'utf8', 'hex') + cipher.final('hex');
   }
@@ -234,19 +228,19 @@ export class OrcidService {
   private decrypt(encrypted: string): string {
     const [ivHex, enc] = encrypted.split(':');
     const iv = Buffer.from(ivHex, 'hex');
-    const key = Buffer.from(process.env.ENCRYPTION_KEY!, 'hex');
+    const key = Buffer.from(process.env.ENCRYPTION_KEY || '12345678901234567890123456789012', 'utf8');
     const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
     return decipher.update(enc, 'hex', 'utf8') + decipher.final('utf8');
   }
 
-    private async getValidAccessToken(profileId: string): Promise<string> {
+  private async getValidAccessToken(profileId: string): Promise<string> {
     const profile = await this.prisma.orcidProfile.findUniqueOrThrow({
       where: { id: profileId },
     });
 
     // Si el token expira en menos de 5 minutos, renovarlo
     const fiveMin = new Date(Date.now() + 5 * 60_000);
-    if (profile.tokenExpiry > fiveMin) {
+    if (profile.expiresAt > fiveMin) {
       return this.decrypt(profile.accessToken);
     }
 
@@ -267,7 +261,7 @@ export class OrcidService {
       // Token expirado definitivamente — marcar para re-auth
       await this.prisma.orcidProfile.update({
         where: { id: profileId },
-        data: { accessToken: '', tokenExpiry: new Date(0) },
+        data: { accessToken: '', expiresAt: new Date(0) },
       });
       throw new Error('ORCID token expirado — el usuario debe re-autenticarse');
     }
@@ -278,7 +272,7 @@ export class OrcidService {
       data: {
         accessToken: this.encrypt(tokenData.access_token),
         refreshToken: this.encrypt(tokenData.refresh_token),
-        tokenExpiry: new Date(Date.now() + tokenData.expires_in * 1000),
+        expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
       },
     });
 

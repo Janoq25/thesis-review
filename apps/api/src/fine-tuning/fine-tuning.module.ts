@@ -1,1 +1,4 @@
-// TODO: Implementar fine-tuning\fine-tuning.module.ts
+import { Module } from '@nestjs/common';
+@Module({})
+export class FineTuningModule {}
+

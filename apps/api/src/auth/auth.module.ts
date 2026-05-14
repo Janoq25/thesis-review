@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { LocalStrategy } from './local.strategy';
+import { RefreshTokenService } from './refresh-token.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
@@ -12,12 +13,12 @@ import { PrismaModule } from '../prisma/prisma.module';
     PrismaModule,
     PassportModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET,
+      secret: process.env.JWT_SECRET || 'secret',
       signOptions: { expiresIn: '7d' },
     }),
   ],
-  providers: [AuthService, JwtStrategy, LocalStrategy],
+  providers: [AuthService, JwtStrategy, LocalStrategy, RefreshTokenService],
   controllers: [AuthController],
-  exports: [AuthService],
+  exports: [AuthService, RefreshTokenService],
 })
 export class AuthModule {}

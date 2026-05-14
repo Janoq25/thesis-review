@@ -1,1 +1,4 @@
-// TODO: Implementar templates\templates.module.ts
+import { Module } from '@nestjs/common';
+@Module({})
+export class TemplatesModule {}
+
