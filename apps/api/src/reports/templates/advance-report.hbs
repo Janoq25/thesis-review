@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #1F2937; line-height: 1.6; }
+    .cover { text-align: center; padding: 40px 0 32px; border-bottom: 2px solid #185FA5; margin-bottom: 28px; }
+    .institution { font-size: 14px; font-weight: 600; color: #185FA5; margin-bottom: 4px; }
+    .doc-title { font-size: 20px; font-weight: 700; color: #111827; margin: 12px 0 8px; }
+    .doc-subtitle { font-size: 12px; color: #6B7280; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+    .meta-card { background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px; }
+    .meta-label { font-size: 10px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; }
+    .meta-value { font-size: 13px; font-weight: 600; color: #111827; margin-top: 2px; }
+    .section-title { font-size: 14px; font-weight: 700; color: #185FA5; margin: 24px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #E5E7EB; }
+    .score-box { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+    .score-item { text-align: center; border: 1px solid #E5E7EB; border-radius: 8px; padding: 10px; }
+    .score-val { font-size: 22px; font-weight: 700; color: #185FA5; }
+    .score-lbl { font-size: 10px; color: #6B7280; margin-top: 2px; }
+    .summary-box { background: #EFF6FF; border-left: 4px solid #185FA5; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 20px; font-size: 11.5px; line-height: 1.7; color: #1E3A5F; }
+    .finding { border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px; margin-bottom: 10px; break-inside: avoid; }
+    .finding-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .severity-badge { font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+    .severity-critical { background: #FEE2E2; color: #991B1B; }
+    .severity-major { background: #FEF3C7; color: #92400E; }
+    .severity-minor { background: #ECFDF5; color: #065F46; }
+    .severity-suggestion { background: #EFF6FF; color: #1E40AF; }
+    .finding-section { font-size: 10px; color: #6B7280; }
+    .finding-desc { font-size: 11.5px; color: #374151; margin-bottom: 6px; }
+    .finding-fix { background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #4B5563; line-height: 1.6; margin-bottom: 6px; }
+    .finding-example { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 6px; padding: 8px 10px; font-size: 10.5px; color: #166534; line-height: 1.6; font-style: italic; }
+    .human-status { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; margin-top: 6px; }
+    .status-accepted { color: #059669; }
+    .status-discarded { color: #9CA3AF; }
+    .grade-final { background: #185FA5; color: #fff; border-radius: 12px; padding: 16px 20px; text-align: center; margin-bottom: 20px; }
+    .grade-big { font-size: 36px; font-weight: 800; }
+    .grade-label { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+    .ref-table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+    .ref-table th { background: #F3F4F6; padding: 6px 8px; text-align: left; font-weight: 600; border-bottom: 1px solid #E5E7EB; }
+    .ref-table td { padding: 6px 8px; border-bottom: 1px solid #F3F4F6; vertical-align: top; }
+    .plagiarism-alert { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; font-size: 10.5px; }
+    .page-break { page-break-before: always; }
+  </style>
+</head>
+<body>
+
+  <!-- PORTADA -->
+  <div class="cover">
+    <div class="institution">{{institution}}</div>
+    <div class="doc-title">Acta de Revisión de Avance de Tesis</div>
+    <div class="doc-subtitle">Evaluación automatizada con IA + Revisión humana</div>
+  </div>
+
+  <!-- METADATOS -->
+  <div class="meta-grid">
+    <div class="meta-card">
+      <div class="meta-label">Estudiante</div>
+      <div class="meta-value">{{advance.student.name}}</div>
+    </div>
+    <div class="meta-card">
+      <div class="meta-label">Programa</div>
+      <div class="meta-value">{{advance.program.name}}</div>
+    </div>
+    <div class="meta-card">
+      <div class="meta-label">Tipo de avance</div>
+      <div class="meta-value">{{advance.advanceType}} · Versión {{advance.version}}</div>
+    </div>
+    <div class="meta-card">
+      <div class="meta-label">Documento patrón</div>
+      <div class="meta-value">{{advance.template.name}} v{{advance.template.version}}</div>
+    </div>
+    <div class="meta-card">
+      <div class="meta-label">Fecha de generación</div>
+      <div class="meta-value">{{formatDate generatedAt}}</div>
+    </div>
+    <div class="meta-card">
+      <div class="meta-label">Estado</div>
+      <div class="meta-value">{{advance.status}}</div>
+    </div>
+  </div>
+
+  <!-- CALIFICACIÓN FINAL -->
+  {{#if review}}
+  <div class="grade-final">
+    <div class="grade-big">{{round review.finalGrade 1}}</div>
+    <div class="grade-label">Nota final · Revisado por {{review.reviewer.name}}</div>
+  </div>
+  {{/if}}
+
+  <!-- EVALUACIÓN IA -->
+  <div class="section-title">I. Evaluación automatizada por IA</div>
+
+  {{#if analysis}}
+  <div class="score-box">
+    <div class="score-item">
+      <div class="score-val">{{round analysis.structureScore 0}}%</div>
+      <div class="score-lbl">Estructura (30%)</div>
+    </div>
+    <div class="score-item">
+      <div class="score-val">{{round analysis.contentScore 0}}%</div>
+      <div class="score-lbl">Contenido (40%)</div>
+    </div>
+    <div class="score-item">
+      <div class="score-val">{{round analysis.formScore 0}}%</div>
+      <div class="score-lbl">Forma (20%)</div>
+    </div>
+    <div class="score-item">
+      <div class="score-val">{{round analysis.originalityScore 0}}%</div>
+      <div class="score-lbl">Originalidad (10%)</div>
+    </div>
+  </div>
+
+  <div class="summary-box">{{analysis.executiveSummary}}</div>
+
+  <div class="section-title">II. Hallazgos detectados ({{findings.length}})</div>
+
+  {{#each findings}}
+  <div class="finding">
+    <div class="finding-header">
+      <span class="severity-badge {{severityClass severity}}">{{severity}}</span>
+      <span class="finding-section">Sección: {{sectionRef}}{{#if pageRef}} · Pág. aprox. {{pageRef}}{{/if}}</span>
+    </div>
+    <div class="finding-desc">{{description}}</div>
+    <div class="finding-fix">{{correctionSteps}}</div>
+    {{#if exampleImprovement}}
+    <div class="finding-example">Ejemplo: {{exampleImprovement}}</div>
+    {{/if}}
+    {{#if humanAccepted}}
+    <div class="human-status status-accepted">✓ Aceptado por el asesor{{#if humanComment}}: {{humanComment}}{{/if}}</div>
+    {{else if humanComment}}
+    <div class="human-status status-discarded">✗ Descartado: {{humanComment}}</div>
+    {{/if}}
+  </div>
+  {{/each}}
+  {{/if}}
+
+  <!-- PLAGIO -->
+  {{#if plagiarism}}
+  <div class="page-break"></div>
+  <div class="section-title">III. Análisis de similitud / plagio</div>
+  <div class="meta-card" style="margin-bottom:12px">
+    <div class="meta-label">Similitud máxima detectada</div>
+    <div class="meta-value">{{round plagiarism.overallScore 1}}% · Método: {{plagiarism.method}}</div>
+  </div>
+  {{#each plagiarism.alerts}}
+  <div class="plagiarism-alert">
+    <strong>Sección: {{sectionName}}</strong> — Similitud: {{round similarity 2}} con {{targetAdvance.student.name}}<br>
+    <em>{{sourceSnippet}}</em>
+  </div>
+  {{/each}}
+  {{/if}}
+
+  <!-- REFERENCIAS -->
+  {{#if references}}
+  <div class="section-title">IV. Verificación bibliográfica (CrossRef)</div>
+  <table class="ref-table">
+    <thead>
+      <tr>
+        <th style="width:60%">Referencia</th>
+        <th style="width:20%">Estado</th>
+        <th style="width:20%">Observación</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each references.references}}
+      <tr>
+        <td>{{rawText}}</td>
+        <td>{{status}}</td>
+        <td>{{suggestion}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  {{/if}}
+
+  <!-- REVISIÓN HUMANA -->
+  {{#if review}}
+  <div class="section-title">V. Comentarios del asesor</div>
+  <div class="summary-box">{{review.humanComment}}</div>
+  {{/if}}
+
+</body>
+</html>

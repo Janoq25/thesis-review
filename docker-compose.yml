@@ -70,6 +70,36 @@ services:
     depends_on:
       - api
 
+  worker-plagiarism:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.worker
+    command: node dist/jobs/plagiarism.worker.js
+    environment:
+      DATABASE_URL: postgresql://thesis:${POSTGRES_PASSWORD}@postgres:5432/thesis_review
+      REDIS_HOST: redis
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on:
+      - postgres
+      - redis
+    deploy:
+      replicas: 2
+
+  worker-fine-tuning:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.worker
+    command: node dist/jobs/fine-tuning.worker.js
+    environment:
+      DATABASE_URL: postgresql://thesis:${POSTGRES_PASSWORD}@postgres:5432/thesis_review
+      REDIS_HOST: redis
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      FT_MIN_PAIRS: ${FT_MIN_PAIRS:-500}
+    depends_on:
+      - postgres
+      - redis
+
+
 volumes:
   pgdata:
   redisdata:

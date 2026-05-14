@@ -18,6 +18,16 @@ enum Role {
   ADMIN
 }
 
+enum ReferenceStatus {
+  VERIFIED
+  DOI_MISSING
+  DOI_INCORRECT
+  NOT_FOUND
+  UNINDEXED
+  POSSIBLE_HALLUCINATION
+}
+
+
 enum AdvanceStatus {
   PENDING
   AI_PROCESSING
@@ -296,3 +306,15 @@ model AuditLog {
   @@index([userId, createdAt])
   @@index([entity, entityId])
 }
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([token])
+}
+
