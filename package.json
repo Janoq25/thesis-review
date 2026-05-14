@@ -1,0 +1,22 @@
+{
+  "name": "thesis-review",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "db:migrate": "prisma migrate deploy --schema=packages/database/schema.prisma",
+    "db:seed": "tsx packages/database/seed.ts",
+    "db:studio": "prisma studio --schema=packages/database/schema.prisma"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0",
+    "tsx": "^4.7.0"
+  }
+}

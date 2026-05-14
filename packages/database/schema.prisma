@@ -1,0 +1,298 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+// ─── Enums ───────────────────────────────────────────────
+
+enum Role {
+  STUDENT
+  ADVISOR
+  COORDINATOR
+  ADMIN
+}
+
+enum AdvanceStatus {
+  PENDING
+  AI_PROCESSING
+  AI_COMPLETE
+  HUMAN_REVIEW
+  OBSERVED
+  APPROVED
+  REJECTED
+}
+
+enum FindingSeverity {
+  CRITICAL
+  MAJOR
+  MINOR
+  SUGGESTION
+}
+
+// ─── Modelos ─────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         Role
+  programId    String?
+  program      Program?  @relation(fields: [programId], references: [id])
+  advisees     User[]    @relation("AdvisorStudents")
+  advisor      User?     @relation("AdvisorStudents", fields: [advisorId], references: [id])
+  advisorId    String?
+  advances     Advance[]
+  reviews      Review[]
+  refreshTokens RefreshToken[]
+  pushTokens   UserPushToken[]
+  orcidProfile OrcidProfile?
+  createdAt    DateTime  @default(now())
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+model UserPushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String   // "ios" | "android"
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Program {
+  id        String          @id @default(cuid())
+  name      String
+  users     User[]
+  templates ThesisTemplate[]
+  advances  Advance[]
+}
+
+model ThesisTemplate {
+  id              String          @id @default(cuid())
+  programId       String
+  program         Program         @relation(fields: [programId], references: [id])
+  name            String
+  version         String
+  fileKey         String          // Clave S3/MinIO
+  extractedSchema Json            // Secciones, subsecciones, extensión esperada
+  rubric          Json            // Pesos por dimensión, criterios de calidad
+  isActive        Boolean         @default(true)
+  embeddings      TemplateChunk[]
+  advances        Advance[]
+  createdAt       DateTime        @default(now())
+}
+
+model TemplateChunk {
+  id          String                      @id @default(cuid())
+  templateId  String
+  template    ThesisTemplate              @relation(fields: [templateId], references: [id])
+  sectionName String
+  content     String
+  embedding   Unsupported("vector(1536)")?
+  chunkIndex  Int
+}
+
+model Advance {
+  id              String          @id @default(cuid())
+  studentId       String
+  student         User            @relation(fields: [studentId], references: [id])
+  programId       String
+  program         Program         @relation(fields: [programId], references: [id])
+  templateId      String
+  template        ThesisTemplate  @relation(fields: [templateId], references: [id])
+  title           String
+  advanceType     String          // "chapter_1" | "chapter_2" | "full"
+  version         Int             @default(1)
+  fileKey         String
+  fileType        String          // "pdf" | "docx"
+  fileSizeBytes   Int
+  pageCount       Int?
+  status          AdvanceStatus   @default(PENDING)
+  aiAnalysis      AIAnalysis?
+  review          Review?
+  chunks          AdvanceChunk[]
+  plagiarismReport PlagiarismReport?
+  referenceAnalysis ReferenceAnalysis?
+  createdAt       DateTime        @default(now())
+}
+
+model AdvanceChunk {
+  id          String                      @id @default(cuid())
+  advanceId   String
+  advance     Advance                     @relation(fields: [advanceId], references: [id])
+  sectionName String
+  content     String
+  embedding   Unsupported("vector(1536)")?
+  chunkIndex  Int
+}
+
+model AIAnalysis {
+  id               String       @id @default(cuid())
+  advanceId        String       @unique
+  advance          Advance      @relation(fields: [advanceId], references: [id])
+  structureScore   Float
+  contentScore     Float
+  formScore        Float
+  originalityScore Float
+  overallScore     Float
+  gradeConverted   Float
+  executiveSummary String
+  findings         AIFinding[]
+  fineTuningPairs  FineTuningPair[]
+  processingMs     Int
+  modelUsed        String
+  createdAt        DateTime     @default(now())
+}
+
+model AIFinding {
+  id                String          @id @default(cuid())
+  analysisId        String
+  analysis          AIAnalysis      @relation(fields: [analysisId], references: [id])
+  sectionRef        String
+  pageRef           Int?
+  severity          FindingSeverity
+  description       String
+  correctionSteps   String
+  exampleImprovement String
+  recommendation    String
+  humanAccepted     Boolean?        // null = no revisado
+  humanComment      String?
+  fineTuningPairs   FineTuningPair[]
+  createdAt         DateTime        @default(now())
+}
+
+model FineTuningPair {
+  id           String     @id @default(cuid())
+  analysisId   String
+  analysis     AIAnalysis @relation(fields: [analysisId], references: [id])
+  findingId    String
+  finding      AIFinding  @relation(fields: [findingId], references: [id])
+  originalOutput String
+  humanCorrection String
+  datasetId    String?
+  createdAt    DateTime   @default(now())
+
+  @@index([datasetId, createdAt])
+}
+
+model Review {
+  id            String        @id @default(cuid())
+  advanceId     String        @unique
+  advance       Advance       @relation(fields: [advanceId], references: [id])
+  reviewerId    String
+  reviewer      User          @relation(fields: [reviewerId], references: [id])
+  finalGrade    Float?
+  humanComment  String?
+  rubricAnswers Json
+  status        AdvanceStatus
+  annotations   ReviewAnnotation[]
+  reviewedAt    DateTime?
+  createdAt     DateTime      @default(now())
+}
+
+model ReviewAnnotation {
+  id         String   @id @default(cuid())
+  reviewId   String
+  review     Review   @relation(fields: [reviewId], references: [id])
+  content    String
+  pageNumber Int
+  xPos       Float?
+  yPos       Float?
+  createdAt  DateTime @default(now())
+
+  @@index([reviewId, pageNumber])
+}
+
+model PlagiarismReport {
+  id              String              @id @default(cuid())
+  advanceId       String              @unique
+  advance         Advance             @relation(fields: [advanceId], references: [id])
+  overallSimilarity Float
+  status          String              // "pending" | "complete" | "error"
+  scanId          String?             // ID de Copyleaks
+  alerts          PlagiarismAlert[]
+  createdAt       DateTime            @default(now())
+}
+
+model PlagiarismAlert {
+  id         String           @id @default(cuid())
+  reportId   String
+  report     PlagiarismReport @relation(fields: [reportId], references: [id])
+  similarity Float
+  sourceUrl  String?
+  matchedText String
+  createdAt  DateTime         @default(now())
+}
+
+model ReferenceAnalysis {
+  id         String      @id @default(cuid())
+  advanceId  String      @unique
+  advance    Advance     @relation(fields: [advanceId], references: [id])
+  references Reference[]
+  createdAt  DateTime    @default(now())
+}
+
+model Reference {
+  id           String            @id @default(cuid())
+  analysisId   String
+  analysis     ReferenceAnalysis @relation(fields: [analysisId], references: [id])
+  rawText      String
+  doi          String?
+  title        String?
+  authors      String?
+  year         Int?
+  verified     Boolean           @default(false)
+  crossrefData Json?
+  issues       String[]
+  createdAt    DateTime          @default(now())
+}
+
+model OrcidProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  orcidId     String   @unique
+  name        String?
+  bio         String?
+  works       Json?
+  accessToken String
+  refreshToken String
+  expiresAt   DateTime
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  entity    String
+  entityId  String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId])
+}

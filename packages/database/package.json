@@ -1,0 +1,14 @@
+{
+  "name": "@thesis-review/database",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "dependencies": {
+    "@prisma/client": "^5.14.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.14.0",
+    "typescript": "^5.4.0",
+    "tsx": "^4.7.0"
+  }
+}
