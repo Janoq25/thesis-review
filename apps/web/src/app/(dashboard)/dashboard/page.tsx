@@ -8,8 +8,6 @@ import { ActivityFeedCard } from '@/components/dashboard/ActivityFeedCard';
 import { StatusChartCard } from '@/components/dashboard/StatusChartCard';
 import { LowComplianceAlert } from '@/components/dashboard/LowComplianceAlert';
 
-export const metadata = { title: 'Dashboard' };
-
 export default function DashboardPage() {
   const { data: kpis, isLoading } = useQuery({
     queryKey: ['dashboard-kpis'],
@@ -31,7 +29,7 @@ export default function DashboardPage() {
           <h1 className="text-xl font-medium text-gray-900">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">Período 2025-II</p>
         </div>
-        
+        <a
           href="/advances/upload"
           className="h-9 px-4 rounded-lg bg-[#185FA5] text-white text-sm font-medium
                      hover:bg-[#0C447C] transition-colors flex items-center gap-1.5"

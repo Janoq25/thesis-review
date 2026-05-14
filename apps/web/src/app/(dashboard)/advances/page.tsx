@@ -1,1 +1,216 @@
-// TODO: Componente/Utilidad app\(dashboard)\advances\page.tsx
+'use client';
+
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import { apiClient } from '@/lib/api-client';
+import { Badge } from '@/components/ui/badge';
+import { cn, formatDate } from '@/lib/utils';
+import {
+  Search, Filter, ChevronLeft, ChevronRight,
+  FileText, Loader2, Eye,
+} from 'lucide-react';
+
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  PENDING: { label: 'Pendiente', className: 'bg-gray-100 text-gray-700' },
+  AI_PROCESSING: { label: 'Analizando IA', className: 'bg-blue-50 text-blue-700' },
+  AI_COMPLETE: { label: 'IA listo', className: 'bg-purple-50 text-purple-700' },
+  HUMAN_REVIEW: { label: 'En revisión', className: 'bg-amber-50 text-amber-700' },
+  OBSERVED: { label: 'Observado', className: 'bg-orange-50 text-orange-700' },
+  APPROVED: { label: 'Aprobado', className: 'bg-green-50 text-green-700' },
+  REJECTED: { label: 'Rechazado', className: 'bg-red-50 text-red-700' },
+};
+
+const STATUSES = ['', 'PENDING', 'AI_PROCESSING', 'AI_COMPLETE', 'HUMAN_REVIEW', 'OBSERVED', 'APPROVED', 'REJECTED'];
+
+export default function AdvancesPage() {
+  const router = useRouter();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const pageSize = 15;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['advances', page, statusFilter],
+    queryFn: () =>
+      apiClient
+        .get('/advances', { params: { page, pageSize, status: statusFilter || undefined } })
+        .then((r) => r.data),
+  });
+
+  const advances = data?.advances ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / pageSize) || 1;
+
+  const filtered = search
+    ? advances.filter(
+        (a: any) =>
+          a.title?.toLowerCase().includes(search.toLowerCase()) ||
+          a.student?.name?.toLowerCase().includes(search.toLowerCase()),
+      )
+    : advances;
+
+  return (
+    <div className="p-6 space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-medium text-gray-900">Avances de tesis</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{total} avances en total</p>
+        </div>
+        <a
+          href="/advances/upload"
+          className="h-9 px-4 rounded-lg bg-[#185FA5] text-white text-sm font-medium
+                     hover:bg-[#0C447C] transition-colors flex items-center gap-1.5"
+        >
+          <span className="text-base leading-none">+</span>
+          Nuevo avance
+        </a>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar por título o estudiante..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full h-9 pl-9 pr-3 rounded-lg border border-gray-200 text-sm
+                       placeholder-gray-400 focus:outline-none focus:ring-2
+                       focus:ring-[#185FA5]/20 focus:border-[#185FA5]"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Filter className="w-4 h-4 text-gray-400" />
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            className="h-9 rounded-lg border border-gray-200 px-3 text-sm text-gray-700"
+          >
+            <option value="">Todos los estados</option>
+            {STATUSES.filter(Boolean).map((s) => (
+              <option key={s} value={s}>
+                {STATUS_CONFIG[s]?.label ?? s}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Tabla */}
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-16">
+            <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No se encontraron avances</p>
+          </div>
+        ) : (
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/60">
+                <th className="px-5 py-3 text-xs font-medium text-gray-500">Título</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500">Estudiante</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 hidden md:table-cell">Tipo</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500">Estado</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 hidden lg:table-cell">Nota IA</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 hidden lg:table-cell">Fecha</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 w-10"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filtered.map((adv: any) => {
+                const statusCfg = STATUS_CONFIG[adv.status] ?? STATUS_CONFIG.PENDING;
+                const score = adv.aiAnalysis?.overallScore;
+                return (
+                  <tr
+                    key={adv.id}
+                    className="hover:bg-gray-50/50 transition-colors cursor-pointer"
+                    onClick={() => router.push(`/advances/${adv.id}/review`)}
+                  >
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className={cn(
+                          'w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 text-[9px] font-medium',
+                          adv.fileType === 'pdf' ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700',
+                        )}>
+                          {(adv.fileType ?? 'doc').toUpperCase()}
+                        </div>
+                        <span className="text-sm text-gray-900 truncate max-w-[200px]">
+                          {adv.title ?? 'Sin título'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 text-sm text-gray-600">
+                      {adv.student?.name ?? '—'}
+                    </td>
+                    <td className="px-5 py-3 text-xs text-gray-500 hidden md:table-cell">
+                      {adv.advanceType?.replace('_', ' ') ?? '—'}
+                    </td>
+                    <td className="px-5 py-3">
+                      <Badge className={cn('text-[10px] border-0', statusCfg.className)}>
+                        {statusCfg.label}
+                      </Badge>
+                    </td>
+                    <td className="px-5 py-3 hidden lg:table-cell">
+                      {score != null ? (
+                        <span className={cn(
+                          'text-xs font-medium px-2 py-0.5 rounded-full',
+                          score >= 80 ? 'bg-green-50 text-green-700'
+                            : score >= 65 ? 'bg-amber-50 text-amber-700'
+                            : 'bg-red-50 text-red-700',
+                        )}>
+                          {score.toFixed(0)}%
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-xs text-gray-500 hidden lg:table-cell">
+                      {adv.createdAt ? formatDate(adv.createdAt) : '—'}
+                    </td>
+                    <td className="px-5 py-3">
+                      <Eye className="w-4 h-4 text-gray-400" />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-500">
+            Página {page} de {totalPages}
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center
+                         text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center
+                         text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

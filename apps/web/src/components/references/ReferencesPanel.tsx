@@ -130,7 +130,7 @@ export function ReferencesPanel({ advanceId }: ReferencesPanelProps) {
                   </div>
 
                   {ref.doi && ref.status === 'VERIFIED' && (
-                    
+                    <a
                       href={`https://doi.org/${ref.doi}`}
                       target="_blank"
                       rel="noopener noreferrer"

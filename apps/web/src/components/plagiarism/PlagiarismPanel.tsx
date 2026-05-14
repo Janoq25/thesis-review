@@ -22,7 +22,7 @@ export function PlagiarismPanel({ advanceId }: PlagiarismPanelProps) {
     queryKey: ['plagiarism-report', advanceId],
     queryFn: () =>
       apiClient.get(`/plagiarism/report/${advanceId}`).then((r) => r.data),
-    refetchInterval: (data) => (data?.status === 'processing' ? 3000 : false),
+    refetchInterval: ({ state }) => (state.data?.status === 'processing' ? 3000 : false),
   });
 
   const analyzeMutation = useMutation({
