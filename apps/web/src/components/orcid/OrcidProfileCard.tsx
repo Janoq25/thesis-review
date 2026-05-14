@@ -76,7 +76,7 @@ export function OrcidProfileCard({ userId }: OrcidProfileCardProps) {
               Sincronizar
             </Button>
             <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-              
+              <a
                 href={`https://orcid.org/${profile.orcidId}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -132,7 +132,7 @@ export function OrcidProfileCard({ userId }: OrcidProfileCardProps) {
                   {pub.journal ?? pub.workType} · {pub.year}
                 </p>
                 {pub.doi && (
-                  
+                  <a
                     href={`https://doi.org/${pub.doi}`}
                     target="_blank"
                     rel="noopener noreferrer"

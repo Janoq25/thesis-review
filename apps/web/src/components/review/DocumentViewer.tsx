@@ -117,7 +117,7 @@ export function DocumentViewer({ advanceId }: DocumentViewerProps) {
         <span className="text-xs text-gray-400 ml-1">{Math.round(scale * 100)}%</span>
 
         <div className="ml-auto flex items-center gap-2">
-          
+          <a
             href={`/api/advances/${advanceId}/download`}
             className="text-xs text-[#185FA5] hover:underline"
             target="_blank"

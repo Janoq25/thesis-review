@@ -84,8 +84,8 @@ export function ReferencesPanel({ advanceId }: ReferencesPanelProps) {
   }
 
   const references = data.references ?? [];
-  const verified = references.filter((r: any) => r.status === 'VERIFIED').length;
-  const errors = references.filter((r: any) => r.status !== 'VERIFIED').length;
+  const verified = references.filter((r: any) => r.verified === true).length;
+  const errors = references.filter((r: any) => r.verified !== true).length;
 
   return (
     <div className="space-y-4">
@@ -129,8 +129,8 @@ export function ReferencesPanel({ advanceId }: ReferencesPanelProps) {
                     </Badge>
                   </div>
 
-                  {ref.doi && ref.status === 'VERIFIED' && (
-                    
+                  {ref.doi && ref.verified && (
+                    <a
                       href={`https://doi.org/${ref.doi}`}
                       target="_blank"
                       rel="noopener noreferrer"

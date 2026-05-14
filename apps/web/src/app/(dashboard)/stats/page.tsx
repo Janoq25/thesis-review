@@ -54,7 +54,7 @@ export default function StatsPage() {
             <Download className="w-4 h-4" />
             Exportar CSV
           </button>
-          
+          <a
             href="/reports/program/batch"
             className="h-9 px-4 rounded-lg bg-[#185FA5] text-white text-sm font-medium
                        hover:bg-[#0C447C] flex items-center gap-1.5"

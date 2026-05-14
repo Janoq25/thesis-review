@@ -31,8 +31,8 @@ export default function ReviewPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['advance-review', id],
     queryFn: () => apiClient.get(`/reviews/panel/${id}`).then((r) => r.data),
-    refetchInterval: (data) =>
-      ['PENDING', 'AI_PROCESSING'].includes(data?.advance?.status) ? 5000 : false,
+    refetchInterval: (query: any) =>
+      ['PENDING', 'AI_PROCESSING'].includes(query?.state?.data?.advance?.status) ? 5000 : false,
   });
 
   const reviewMutation = useMutation({
