@@ -71,7 +71,7 @@ export default function StudentDashboardPage() {
         </div>
         <div className="rounded-xl border border-amber-100 dark:border-amber-900 bg-amber-50/30 dark:bg-amber-950/30 p-4 text-center">
           <p className="text-2xl font-medium text-amber-700 dark:text-amber-300">{observed + inProgress}</p>
-          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">{t('student.inProgressObserved')}</p>
+          <p className="text-xs text-green-600 dark:text-green-400 mt-1">{t('student.inProgressObserved')}</p>
         </div>
       </div>
 
@@ -102,10 +102,13 @@ export default function StudentDashboardPage() {
               advanceType?: string;
               createdAt?: string;
               aiAnalysis?: { overallScore?: number };
+              plagiarismReport?: { overallSimilarity?: number };
             }) => {
               const statusCfg = STATUS_CONFIG[adv.status] ?? STATUS_CONFIG.PENDING;
               const StatusIcon = STATUS_ICONS[adv.status] ?? Clock;
               const score = adv.aiAnalysis?.overallScore;
+              const similarity = adv.plagiarismReport?.overallSimilarity;
+
               return (
                 <button
                   key={adv.id}
@@ -136,6 +139,20 @@ export default function StudentDashboardPage() {
                   </div>
 
                   <div className="flex items-center gap-3 flex-shrink-0">
+                    {similarity != null && (
+                      <span
+                        className={cn(
+                          'text-xs font-medium px-2 py-0.5 rounded-full border',
+                          similarity >= 15
+                            ? 'bg-red-50 text-red-700 border-red-100'
+                            : similarity >= 10
+                              ? 'bg-amber-50 text-amber-700 border-amber-100'
+                              : 'bg-green-50 text-green-700 border-green-100',
+                        )}
+                      >
+                        P: {similarity.toFixed(0)}%
+                      </span>
+                    )}
                     {score != null && (
                       <span
                         className={cn(
@@ -147,7 +164,7 @@ export default function StudentDashboardPage() {
                               : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300',
                         )}
                       >
-                        {score.toFixed(0)}%
+                        IA: {score.toFixed(0)}%
                       </span>
                     )}
                     <Badge className={cn('text-[10px] border-0 flex items-center gap-1', statusCfg.className)}>

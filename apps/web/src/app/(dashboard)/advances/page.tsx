@@ -113,6 +113,7 @@ export default function AdvancesPage() {
                 <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">{t('advances.type')}</th>
                 <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">{t('advances.filterStatus')}</th>
                 <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 hidden lg:table-cell">{t('advances.score')}</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 hidden lg:table-cell">Plagio</th>
                 <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 hidden lg:table-cell">{t('advances.date')}</th>
                 <th className="px-5 py-3 w-10" />
               </tr>
@@ -127,9 +128,12 @@ export default function AdvancesPage() {
                 createdAt?: string;
                 student?: { name?: string };
                 aiAnalysis?: { overallScore?: number };
+                plagiarismReport?: { overallSimilarity?: number };
               }) => {
                 const statusCfg = STATUS_CONFIG[adv.status] ?? STATUS_CONFIG.PENDING;
                 const score = adv.aiAnalysis?.overallScore;
+                const similarity = adv.plagiarismReport?.overallSimilarity;
+
                 return (
                   <tr
                     key={adv.id}
@@ -177,6 +181,24 @@ export default function AdvancesPage() {
                           )}
                         >
                           {score.toFixed(0)}%
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 hidden lg:table-cell">
+                      {similarity != null ? (
+                        <span
+                          className={cn(
+                            'text-xs font-medium px-2 py-0.5 rounded-full border',
+                            similarity >= 15
+                              ? 'bg-red-50 text-red-700 border-red-100'
+                              : similarity >= 10
+                                ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                : 'bg-green-50 text-green-700 border-green-100',
+                          )}
+                        >
+                          {similarity.toFixed(1)}%
                         </span>
                       ) : (
                         <span className="text-xs text-gray-400">—</span>

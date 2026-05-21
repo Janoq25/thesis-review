@@ -75,16 +75,16 @@ export function PlagiarismPanel({ advanceId }: PlagiarismPanelProps) {
 
   const alerts = report?.alerts ?? [];
   const criticalAlerts = alerts.filter((a: any) => a.severity === 'critical');
-  const score = report?.overallScore ?? 0;
+  const score = report?.overallSimilarity ?? 0;
 
   return (
     <div className="space-y-4">
       {/* Resumen */}
       <div
         className={`rounded-xl border p-4 flex items-center justify-between ${
-          score >= 85
+          score >= 15
             ? 'border-red-200 bg-red-50'
-            : score >= 70
+            : score >= 10
             ? 'border-amber-200 bg-amber-50'
             : 'border-green-200 bg-green-50'
         }`}
@@ -94,7 +94,7 @@ export function PlagiarismPanel({ advanceId }: PlagiarismPanelProps) {
             Similitud máxima detectada:{' '}
             <span
               className={`font-semibold ${
-                score >= 85 ? 'text-red-700' : score >= 70 ? 'text-amber-700' : 'text-green-700'
+                score >= 15 ? 'text-red-700' : score >= 10 ? 'text-amber-700' : 'text-green-700'
               }`}
             >
               {score.toFixed(1)}%

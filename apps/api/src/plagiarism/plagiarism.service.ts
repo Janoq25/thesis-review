@@ -22,7 +22,11 @@ export class PlagiarismService {
       include: { program: true },
     });
 
-    // Crear reporte inicial
+    // Crear reporte inicial (limpiando el anterior si existe)
+    await this.prisma.plagiarismReport.deleteMany({
+      where: { advanceId },
+    });
+
     const report = await this.prisma.plagiarismReport.create({
       data: {
         advanceId,
@@ -102,9 +106,10 @@ export class PlagiarismService {
 
     // Deduplicar por targetAdvanceId + sectionName, quedarse con mayor similitud
     const deduped = this.deduplicateAlerts(alerts);
-    const overallScore = deduped.length > 0
-      ? Math.max(...deduped.map((a) => a.similarity)) * 100
-      : 0;
+    
+    // MOCK: Usar un número aleatorio entre 0 y 20 tal como pidió el usuario
+    const mockSimilarity = Math.floor(Math.random() * 21);
+    const overallScore = mockSimilarity;
 
     // Guardar alertas y actualizar reporte
     await this.prisma.$transaction([
@@ -115,13 +120,13 @@ export class PlagiarismService {
         where: { id: report.id },
         data: {
           status: 'complete',
-          overallSimilarity: Math.round(overallScore * 10) / 10,
+          overallSimilarity: overallScore,
         },
       }),
     ]);
 
     this.logger.log(
-      `Plagio analizado — avance ${advanceId}: ${deduped.length} alertas, score máx ${overallScore.toFixed(1)}%`,
+      `Plagio analizado (MOCK) — avance ${advanceId}: ${deduped.length} alertas, score mock ${overallScore}%`,
     );
   }
 

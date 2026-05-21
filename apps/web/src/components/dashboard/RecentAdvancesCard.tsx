@@ -28,6 +28,7 @@ interface Advance {
   student: { name: string };
   program: { name: string };
   aiAnalysis?: { overallScore: number };
+  plagiarismReport?: { overallSimilarity: number };
 }
 
 export function RecentAdvancesCard({ advances }: { advances: Advance[] }) {
@@ -75,6 +76,18 @@ export function RecentAdvancesCard({ advances }: { advances: Advance[] }) {
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {adv.aiAnalysis && <ScorePill score={adv.aiAnalysis.overallScore} />}
+                {adv.plagiarismReport && (
+                  <span className={cn(
+                    'text-[10px] font-medium px-2 py-0.5 rounded-full border',
+                    adv.plagiarismReport.overallSimilarity >= 15 
+                      ? 'bg-red-50 text-red-700 border-red-100' 
+                      : adv.plagiarismReport.overallSimilarity >= 10
+                      ? 'bg-amber-50 text-amber-700 border-amber-100'
+                      : 'bg-green-50 text-green-700 border-green-100'
+                  )}>
+                    P: {adv.plagiarismReport.overallSimilarity}%
+                  </span>
+                )}
                 <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full', statusCfg.className)}>
                   {statusCfg.label}
                 </span>

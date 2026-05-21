@@ -168,6 +168,9 @@ export class AdvancesService {
             _count: { select: { findings: true } },
           },
         },
+        plagiarismReport: {
+          select: { overallSimilarity: true, status: true },
+        },
         program: { select: { name: true } },
       },
       orderBy: [{ advanceType: 'asc' }, { version: 'desc' }],
@@ -196,6 +199,9 @@ export class AdvancesService {
           student: { select: { id: true, name: true } },
           program: { select: { name: true } },
           aiAnalysis: { select: { overallScore: true, gradeConverted: true } },
+          plagiarismReport: {
+            select: { overallSimilarity: true, status: true },
+          },
           review: { select: { status: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -286,6 +292,9 @@ export class AdvancesService {
           student: { select: { id: true, name: true } },
           program: { select: { name: true } },
           aiAnalysis: { select: { overallScore: true, gradeConverted: true } },
+          plagiarismReport: {
+            select: { overallSimilarity: true, status: true },
+          },
           review: { select: { status: true, finalGrade: true } },
         },
         orderBy: { createdAt: 'desc' },

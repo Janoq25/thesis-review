@@ -89,11 +89,14 @@ export const aiWorker = new Worker(
       const result = await analyzeDocument(text, advance.template.rubric, advance.advanceType);
       const processingMs = Date.now() - aiStart;
 
-      jobLog(SCOPE, 'Respuesta de IA recibida', {
+      // MOCK: Aleatorizar los scores tal como pidió el usuario (0-20 para la nota convertida)
+      const mockGrade = Math.floor(Math.random() * 21); // 0-20
+      const mockScore = (mockGrade / 20) * 100; // Mapear a 0-100 para los demás campos
+
+      jobLog(SCOPE, 'Respuesta de IA recibida (Aplicando MOCK)', {
         advanceId,
         processingMs,
-        overallScore: result.overallScore,
-        findingsCount: result.findings.length,
+        mockGrade,
       });
 
       await prisma.$transaction(async (tx) => {
@@ -107,12 +110,12 @@ export const aiWorker = new Worker(
         await tx.aIAnalysis.create({
           data: {
             advanceId,
-            structureScore: result.structureScore,
-            contentScore: result.contentScore,
-            formScore: result.formScore,
-            originalityScore: result.originalityScore,
-            overallScore: result.overallScore,
-            gradeConverted: result.gradeConverted,
+            structureScore: mockScore,
+            contentScore: mockScore,
+            formScore: mockScore,
+            originalityScore: mockScore,
+            overallScore: mockScore,
+            gradeConverted: mockGrade,
             executiveSummary: result.executiveSummary,
             processingMs,
             modelUsed:

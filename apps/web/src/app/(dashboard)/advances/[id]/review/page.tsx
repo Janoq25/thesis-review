@@ -83,6 +83,23 @@ export default function ReviewPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          {advance?.aiAnalysis && (
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-100 text-xs font-medium">
+              Nota IA: {advance.aiAnalysis.gradeConverted?.toFixed(1)}
+            </span>
+          )}
+          
+          {data?.plagiarism?.overallSimilarity != null && (
+            <span className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium",
+              data.plagiarism.overallSimilarity >= 15 ? "bg-red-50 text-red-700 border-red-100" :
+              data.plagiarism.overallSimilarity >= 10 ? "bg-amber-50 text-amber-700 border-amber-100" :
+              "bg-green-50 text-green-700 border-green-100"
+            )}>
+              Plagio: {data.plagiarism.overallSimilarity.toFixed(1)}%
+            </span>
+          )}
+
           {/* Status badge */}
           <span
             className={cn(
