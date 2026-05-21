@@ -20,6 +20,10 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "paths": {
+      "@thesis-review/shared": ["../../packages/shared/src"],
+      "@thesis-review/database": ["../../packages/database"]
+    }
   }
 }

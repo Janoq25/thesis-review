@@ -192,10 +192,9 @@ export default function UploadPage() {
               onChange={(e) => setAdvanceType(e.target.value)}
               className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm"
             >
-              <option value="chapter_1">Capítulo 1 — Problema de investigación</option>
-              <option value="chapter_2">Capítulo 2 — Marco teórico</option>
-              <option value="chapter_3">Capítulo 3 — Metodología</option>
-              <option value="chapter_4">Capítulo 4 — Resultados</option>
+              <option value="chapter_1">CAPITULO I: INTRODUCCIÓN</option>
+              <option value="chapter_2">CAPITULO II: MÉTODO</option>
+              <option value="chapter_3">CAPITULO III: ASPECTOS ADMINISTRATIVOS</option>
               <option value="full">Avance completo</option>
             </select>
           </div>

@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { href: '/advances', label: 'Avances', icon: FileSearch, roles: ['ADVISOR','COORDINATOR','ADMIN'] },
   { href: '/student/dashboard', label: 'Mis avances', icon: BookOpen, roles: ['STUDENT'] },
   { href: '/bulk-review', label: 'Revisión por lotes', icon: Layers, roles: ['COORDINATOR','ADMIN'] },
+  { href: '/templates', label: 'Documentos Patrón', icon: BookOpen, roles: ['COORDINATOR','ADMIN'] },
   { href: '/stats', label: 'Estadísticas', icon: BarChart3, roles: ['COORDINATOR','ADMIN'] },
   { href: '/users', label: 'Usuarios', icon: Users, roles: ['ADMIN'] },
   { href: '/config', label: 'Configuración', icon: Settings, roles: ['COORDINATOR','ADMIN'] },

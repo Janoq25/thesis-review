@@ -35,13 +35,13 @@ export class TemplatesController {
   }
 
   @Get('program/:programId')
-  @Roles('ADVISOR', 'COORDINATOR', 'ADMIN')
+  @Roles('STUDENT', 'ADVISOR', 'COORDINATOR', 'ADMIN')
   listByProgram(@Param('programId') programId: string) {
     return this.templatesService.listByProgram(programId);
   }
 
   @Get(':id')
-  @Roles('ADVISOR', 'COORDINATOR', 'ADMIN')
+  @Roles('STUDENT', 'ADVISOR', 'COORDINATOR', 'ADMIN')
   getOne(@Param('id') id: string) {
     return this.templatesService.getOne(id);
   }

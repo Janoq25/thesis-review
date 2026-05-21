@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import * as path from 'path';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
@@ -62,6 +63,7 @@ export class AdvancesService {
     await this.storage.upload(fileKey, file.buffer, file.mimetype);
 
     // Crear registro en BD
+    const fileName = path.parse(file.originalname).name;
     const advance = await this.prisma.advance.create({
       data: {
         studentId,
@@ -72,7 +74,7 @@ export class AdvancesService {
         fileKey,
         fileType,
         fileSizeBytes: file.size,
-        title: `${advanceType} v${version}`,
+        title: fileName,
         status: 'PENDING',
       },
     });
