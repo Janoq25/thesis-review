@@ -1,21 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { OpenAIEmbeddings } from '@langchain/openai';
+import { AzureOpenAIEmbeddings } from '@langchain/openai';
+import { createAzureEmbeddings } from '../common/azure-openai.config';
 
 @Injectable()
 export class PlagiarismService {
   private readonly logger = new Logger(PlagiarismService.name);
-  private embeddings: OpenAIEmbeddings;
+  private embeddings: AzureOpenAIEmbeddings;
 
   // Umbral a partir del cual se considera alerta crítica
   private readonly CRITICAL_THRESHOLD = 0.85;
   private readonly WARNING_THRESHOLD = 0.70;
 
   constructor(private prisma: PrismaService) {
-    this.embeddings = new OpenAIEmbeddings({
-      apiKey: process.env.OPENAI_API_KEY,
-      model: 'text-embedding-3-large',
-    });
+    this.embeddings = createAzureEmbeddings();
   }
 
   async analyzeByEmbeddings(advanceId: string): Promise<void> {

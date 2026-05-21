@@ -7,7 +7,7 @@ import { TemplatesController } from './templates.controller';
 @Module({
   imports: [
     StorageModule,
-    BullModule.registerQueue({ name: 'ai-analysis' }),
+    BullModule.registerQueue({ name: 'template-indexing' }),
   ],
   controllers: [TemplatesController],
   providers: [TemplatesService],

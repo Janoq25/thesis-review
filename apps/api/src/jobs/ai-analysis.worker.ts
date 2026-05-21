@@ -2,71 +2,180 @@ import { Worker, Job } from 'bullmq';
 import { PrismaClient } from '@prisma/client';
 import { StorageService } from '../storage/storage.service';
 import { extractText, analyzeDocument } from '@thesis-review/ai-engine';
+import { getRedisConnection } from '../common/redis-connection';
+import { jobLog, jobError, jobWarn } from '../common/job-logger';
 
+const SCOPE = 'ai-analysis';
 const prisma = new PrismaClient();
 const storage = new StorageService();
+
+async function markAdvanceFailed(advanceId: string, reason: string) {
+  jobError(SCOPE, 'Marcando avance como PENDING tras fallo definitivo', { advanceId, reason });
+  await prisma.advance.update({
+    where: { id: advanceId },
+    data: { status: 'PENDING' },
+  });
+}
 
 export const aiWorker = new Worker(
   'ai-analysis',
   async (job: Job<{ advanceId: string }>) => {
+    if (job.name !== 'analyze') {
+      jobWarn(SCOPE, 'Job ignorado (nombre no es analyze)', { jobId: job.id, name: job.name });
+      return;
+    }
+
     const { advanceId } = job.data;
+    const startedAt = Date.now();
 
-    await prisma.advance.update({
-      where: { id: advanceId },
-      data: { status: 'AI_PROCESSING' },
+    jobLog(SCOPE, 'Job recibido', {
+      jobId: job.id,
+      advanceId,
+      attempt: job.attemptsMade + 1,
+      maxAttempts: job.opts.attempts ?? 1,
     });
 
-    console.log(`[ai-analysis worker] Iniciando procesamiento avance ${advanceId}`);
-
-    const advance = await prisma.advance.findUniqueOrThrow({
-      where: { id: advanceId },
-      include: { template: true },
-    });
-
-    const fileBuffer = await storage.download(advance.fileKey);
-    const text = await extractText(fileBuffer, advance.fileType as 'pdf' | 'docx');
-
-    console.log(`[ai-analysis worker] Texto extraído (${text.length} caracteres), analizando con IA...`);
-    const startTime = Date.now();
-    const result = await analyzeDocument(text, advance.template.rubric, advance.advanceType);
-    const processingMs = Date.now() - startTime;
-
-    console.log(`[ai-analysis worker] Análisis completado, guardando resultados...`);
-
-    await prisma.$transaction(async (tx) => {
-      await tx.aIAnalysis.create({
-        data: {
-          advanceId,
-          structureScore: result.structureScore,
-          contentScore: result.contentScore,
-          formScore: result.formScore,
-          originalityScore: result.originalityScore,
-          overallScore: result.overallScore,
-          gradeConverted: result.gradeConverted,
-          executiveSummary: result.executiveSummary,
-          processingMs,
-          modelUsed: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'gpt-4o',
-          findings: {
-            create: result.findings.map(f => ({
-              sectionRef: f.sectionRef,
-              pageRef: f.pageRef || null,
-              severity: f.severity,
-              description: f.description,
-              correctionSteps: f.correctionSteps,
-              exampleImprovement: f.exampleImprovement,
-              recommendation: f.recommendation,
-            })),
-          },
-        },
-      });
-
-      await tx.advance.update({
+    try {
+      await prisma.advance.update({
         where: { id: advanceId },
-        data: { status: 'AI_COMPLETE' },
+        data: { status: 'AI_PROCESSING' },
       });
-    });
+      jobLog(SCOPE, 'Estado → AI_PROCESSING', { advanceId });
 
-    console.log(`[ai-analysis worker] Procesamiento exitoso para avance ${advanceId}`);
+      const advance = await prisma.advance.findUniqueOrThrow({
+        where: { id: advanceId },
+        include: { template: true },
+      });
+
+      jobLog(SCOPE, 'Avance cargado', {
+        advanceId,
+        advanceType: advance.advanceType,
+        fileKey: advance.fileKey,
+        templateId: advance.templateId,
+      });
+
+      jobLog(SCOPE, 'Descargando archivo de MinIO', { fileKey: advance.fileKey });
+      const fileBuffer = await storage.download(advance.fileKey);
+
+      jobLog(SCOPE, 'Extrayendo texto', { fileType: advance.fileType, bytes: fileBuffer.length });
+      const text = await extractText(fileBuffer, advance.fileType as 'pdf' | 'docx');
+      jobLog(SCOPE, 'Texto extraído', { advanceId, charCount: text.length });
+
+      if (text.trim().length < 100) {
+        throw new Error(`Texto extraído demasiado corto (${text.trim().length} caracteres)`);
+      }
+
+      jobLog(SCOPE, 'Llamando Azure OpenAI (analyzeDocument)', {
+        advanceId,
+        deployment:
+          process.env.AZURE_OPENAI_DEPLOYMENT_NAME ??
+          process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ??
+          'gpt-4o',
+      });
+
+      const aiStart = Date.now();
+      const result = await analyzeDocument(text, advance.template.rubric, advance.advanceType);
+      const processingMs = Date.now() - aiStart;
+
+      jobLog(SCOPE, 'Respuesta de IA recibida', {
+        advanceId,
+        processingMs,
+        overallScore: result.overallScore,
+        findingsCount: result.findings.length,
+      });
+
+      await prisma.$transaction(async (tx) => {
+        const existing = await tx.aIAnalysis.findUnique({ where: { advanceId } });
+        if (existing) {
+          await tx.aIFinding.deleteMany({ where: { analysisId: existing.id } });
+          await tx.aIAnalysis.delete({ where: { id: existing.id } });
+          jobWarn(SCOPE, 'Análisis previo reemplazado', { advanceId, previousAnalysisId: existing.id });
+        }
+
+        await tx.aIAnalysis.create({
+          data: {
+            advanceId,
+            structureScore: result.structureScore,
+            contentScore: result.contentScore,
+            formScore: result.formScore,
+            originalityScore: result.originalityScore,
+            overallScore: result.overallScore,
+            gradeConverted: result.gradeConverted,
+            executiveSummary: result.executiveSummary,
+            processingMs,
+            modelUsed:
+              process.env.AZURE_OPENAI_DEPLOYMENT_NAME ??
+              process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ??
+              'gpt-4o',
+            findings: {
+              create: result.findings.map((f) => ({
+                sectionRef: f.sectionRef,
+                pageRef: f.pageRef ?? null,
+                severity: f.severity,
+                description: f.description,
+                correctionSteps: f.correctionSteps,
+                exampleImprovement: f.exampleImprovement,
+                recommendation: f.recommendation,
+              })),
+            },
+          },
+        });
+
+        await tx.advance.update({
+          where: { id: advanceId },
+          data: { status: 'AI_COMPLETE' },
+        });
+      });
+
+      jobLog(SCOPE, 'Procesamiento exitoso → AI_COMPLETE', {
+        advanceId,
+        totalMs: Date.now() - startedAt,
+        findings: result.findings.length,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      jobError(SCOPE, 'Error en job', {
+        jobId: job.id,
+        advanceId,
+        attempt: job.attemptsMade + 1,
+        error: message,
+        stack: stack?.split('\n').slice(0, 5).join(' | '),
+      });
+      throw err;
+    }
   },
-  { connection: { host: process.env.REDIS_HOST || 'localhost', port: 6379 }, concurrency: 4 }
+  {
+    connection: getRedisConnection(),
+    concurrency: 2,
+  },
 );
+
+aiWorker.on('completed', (job) => {
+  jobLog(SCOPE, 'Job completado en cola', {
+    jobId: job.id,
+    advanceId: job.data?.advanceId,
+    durationMs: job.finishedOn && job.processedOn ? job.finishedOn - job.processedOn : undefined,
+  });
+});
+
+aiWorker.on('failed', async (job, err) => {
+  const advanceId = job?.data?.advanceId;
+  jobError(SCOPE, 'Job fallido en cola', {
+    jobId: job?.id,
+    advanceId,
+    attempts: job?.attemptsMade,
+    error: err?.message,
+  });
+
+  const maxAttempts = job?.opts?.attempts ?? 1;
+  if (job && job.attemptsMade >= maxAttempts && advanceId) {
+    await markAdvanceFailed(advanceId, err.message);
+  }
+});
+
+aiWorker.on('active', (job) => {
+  jobLog(SCOPE, 'Job activo', { jobId: job.id, advanceId: job.data?.advanceId });
+});
+
+jobLog(SCOPE, 'Worker registrado en cola ai-analysis (solo jobs "analyze")');

@@ -3,25 +3,21 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
-import { ChatOpenAI } from '@langchain/openai';
+import { AzureChatOpenAI } from '@langchain/openai';
+import { createAzureChatLLM } from '../common/azure-openai.config';
 import mammoth from 'mammoth';
 import pdfParse from 'pdf-parse';
 
 @Injectable()
 export class TemplatesService {
-  private llm: ChatOpenAI;
+  private llm: AzureChatOpenAI;
 
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
-    @InjectQueue('ai-analysis') private aiQueue: Queue,
+    @InjectQueue('template-indexing') private templateQueue: Queue,
   ) {
-    this.llm = new ChatOpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      model: 'gpt-4o',
-      temperature: 0,
-      modelKwargs: { response_format: { type: 'json_object' } },
-    });
+    this.llm = createAzureChatLLM();
   }
 
   async uploadTemplate(params: {
@@ -89,10 +85,10 @@ export class TemplatesService {
     });
 
     // Encolar generación de embeddings del template
-    await this.aiQueue.add(
+    await this.templateQueue.add(
       'index-template',
       { templateId: template.id, text: text.substring(0, 30000) },
-      { priority: 1 },
+      { priority: 1, attempts: 2 },
     );
 
     return template;

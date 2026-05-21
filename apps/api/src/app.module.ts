@@ -41,6 +41,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 
     BullModule.registerQueue(
       { name: 'ai-analysis' },
+      { name: 'template-indexing' },
       { name: 'plagiarism-analysis' },
       { name: 'reference-check' },
       { name: 'fine-tuning-status' },

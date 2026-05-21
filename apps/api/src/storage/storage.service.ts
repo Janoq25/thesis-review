@@ -19,9 +19,10 @@ export class StorageService implements OnModuleInit {
 
   async onModuleInit() {
     const exists = await this.client.bucketExists(this.bucket);
-    if (!exists) {
+    if (exists) return;
+
+    try {
       await this.client.makeBucket(this.bucket, 'us-east-1');
-      // Política: archivos privados, solo acceso por presigned URL
       await this.client.setBucketPolicy(
         this.bucket,
         JSON.stringify({
@@ -29,6 +30,11 @@ export class StorageService implements OnModuleInit {
           Statement: [{ Effect: 'Deny', Principal: '*', Action: 's3:GetObject', Resource: `arn:aws:s3:::${this.bucket}/*` }],
         }),
       );
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code !== 'BucketAlreadyOwnedByYou' && code !== 'BucketAlreadyExists') {
+        throw err;
+      }
     }
   }
 

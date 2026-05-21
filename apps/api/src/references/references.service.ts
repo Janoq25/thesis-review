@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ChatOpenAI } from '@langchain/openai';
+import { AzureChatOpenAI } from '@langchain/openai';
+import { createAzureChatLLM } from '../common/azure-openai.config';
 
 interface ExtractedReference {
   rawText: string;
@@ -28,17 +29,14 @@ interface CrossRefWork {
 @Injectable()
 export class CrossRefService {
   private readonly logger = new Logger(CrossRefService.name);
-  private llm: ChatOpenAI;
+  private llm: AzureChatOpenAI;
   private readonly CROSSREF_BASE = 'https://api.crossref.org/works';
   private readonly SIMILARITY_THRESHOLD = 0.75;
 
   constructor(private prisma: PrismaService) {
-    this.llm = new ChatOpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      model: 'gpt-4o-mini',
-      temperature: 0,
-      modelKwargs: { response_format: { type: 'json_object' } },
-    });
+    this.llm = createAzureChatLLM(
+      process.env.AZURE_OPENAI_CHAT_MINI_DEPLOYMENT ?? 'gpt-4o-mini',
+    );
   }
 
   async analyzeReferences(advanceId: string, documentText: string): Promise<void> {

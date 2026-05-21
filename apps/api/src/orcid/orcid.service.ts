@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ChatOpenAI } from '@langchain/openai';
+import { AzureChatOpenAI } from '@langchain/openai';
+import { createAzureChatLLM } from '../common/azure-openai.config';
 import * as crypto from 'crypto';
 
 const ORCID_BASE = 'https://pub.orcid.org/v3.0';
@@ -9,15 +10,12 @@ const ORCID_AUTH = 'https://orcid.org/oauth';
 @Injectable()
 export class OrcidService {
   private readonly logger = new Logger(OrcidService.name);
-  private llm: ChatOpenAI;
+  private llm: AzureChatOpenAI;
 
   constructor(private prisma: PrismaService) {
-    this.llm = new ChatOpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      model: 'gpt-4o-mini',
-      temperature: 0,
-      modelKwargs: { response_format: { type: 'json_object' } },
-    });
+    this.llm = createAzureChatLLM(
+      process.env.AZURE_OPENAI_CHAT_MINI_DEPLOYMENT ?? 'gpt-4o-mini',
+    );
   }
 
   // Paso 1: Generar URL de autorización OAuth ORCID

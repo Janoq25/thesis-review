@@ -82,6 +82,13 @@ export class AdvancesController {
     return this.advancesService.getAdvanceDetail(id, req.user.id, req.user.role);
   }
 
+  @Post(':id/retry-ai')
+  @Roles('ADVISOR', 'COORDINATOR', 'ADMIN', 'STUDENT')
+  @HttpCode(HttpStatus.ACCEPTED)
+  retryAi(@Param('id') id: string) {
+    return this.advancesService.retryAiAnalysis(id);
+  }
+
   @Patch(':id/status')
   @Roles('ADVISOR', 'COORDINATOR', 'ADMIN')
   updateStatus(

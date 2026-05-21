@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import * as path from 'path';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -16,6 +17,8 @@ const MAX_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
 @Injectable()
 export class AdvancesService {
+  private readonly logger = new Logger(AdvancesService.name);
+
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
@@ -79,11 +82,16 @@ export class AdvancesService {
       },
     });
 
+    this.logger.log(`Encolando análisis IA para avance ${advance.id}`);
+
     // Encolar jobs en paralelo
     await Promise.all([
       this.aiQueue.add('analyze', { advanceId: advance.id }, {
+        jobId: `analyze-${advance.id}`,
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: 100,
+        removeOnFail: 50,
       }),
       this.plagiarismQueue.add('analyze', {
         advanceId: advance.id,
@@ -96,6 +104,33 @@ export class AdvancesService {
     this.events.emit('advance.created', { advanceId: advance.id, studentId });
 
     return advance;
+  }
+
+  async retryAiAnalysis(advanceId: string) {
+    const advance = await this.prisma.advance.findUniqueOrThrow({
+      where: { id: advanceId },
+      select: { id: true, status: true },
+    });
+
+    if (!['PENDING', 'AI_PROCESSING'].includes(advance.status)) {
+      throw new BadRequestException(
+        `Solo se puede reintentar análisis en estado PENDING o AI_PROCESSING (actual: ${advance.status})`,
+      );
+    }
+
+    this.logger.warn(`Reencolando análisis IA para avance ${advanceId}`);
+
+    await this.aiQueue.add(
+      'analyze',
+      { advanceId },
+      {
+        jobId: `analyze-${advanceId}-retry-${Date.now()}`,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+      },
+    );
+
+    return { advanceId, queued: true };
   }
 
   async getAdvanceDetail(advanceId: string, requesterId: string, requesterRole: string) {

@@ -23,16 +23,45 @@ const analysisSchema = z.object({
 
 export type AIAnalysisResult = z.infer<typeof analysisSchema>;
 
+function azureInstanceName(): string {
+  if (process.env.AZURE_OPENAI_API_INSTANCE_NAME) {
+    return process.env.AZURE_OPENAI_API_INSTANCE_NAME;
+  }
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
+  if (!endpoint) {
+    throw new Error('AZURE_OPENAI_ENDPOINT or AZURE_OPENAI_API_INSTANCE_NAME is required');
+  }
+  return new URL(endpoint).hostname.split('.')[0];
+}
+
+function log(step: string, meta?: Record<string, unknown>) {
+  const suffix = meta ? ` ${JSON.stringify(meta)}` : '';
+  console.log(`[ai-engine:analyzer] ${step}${suffix}`);
+}
+
 export async function analyzeDocument(
   text: string, 
   rubric: any, 
   advanceType: string
 ): Promise<AIAnalysisResult> {
+  log('Inicio analyzeDocument', {
+    advanceType,
+    textLength: text.length,
+    deployment:
+      process.env.AZURE_OPENAI_DEPLOYMENT_NAME ??
+      process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ??
+      'gpt-4o',
+    instance: azureInstanceName(),
+  });
+
   const llm = new AzureChatOpenAI({
     azureOpenAIApiKey: process.env.AZURE_OPENAI_API_KEY,
-    azureOpenAIApiInstanceName: process.env.AZURE_OPENAI_API_INSTANCE_NAME,
-    azureOpenAIApiDeploymentName: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
-    azureOpenAIApiVersion: process.env.AZURE_OPENAI_API_VERSION,
+    azureOpenAIApiInstanceName: azureInstanceName(),
+    azureOpenAIApiDeploymentName:
+      process.env.AZURE_OPENAI_DEPLOYMENT_NAME ??
+      process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ??
+      'gpt-4o',
+    azureOpenAIApiVersion: process.env.AZURE_OPENAI_API_VERSION ?? '2024-08-01-preview',
     temperature: 0.4, 
   });
 
@@ -66,10 +95,26 @@ TEXTO DEL ESTUDIANTE:
 
   const chain = prompt.pipe(structuredLlm);
 
-  const result = await chain.invoke({
-    advanceType,
-    rubric: JSON.stringify(rubric, null, 2),
-    text: text.substring(0, 50000), 
+  log('Invocando Azure OpenAI (structured output)...');
+  const invokeStart = Date.now();
+
+  let result: AIAnalysisResult;
+  try {
+    result = await chain.invoke({
+      advanceType,
+      rubric: JSON.stringify(rubric, null, 2),
+      text: text.substring(0, 50000),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log('Error en invocación Azure', { error: message, elapsedMs: Date.now() - invokeStart });
+    throw err;
+  }
+
+  log('Respuesta validada por schema Zod', {
+    elapsedMs: Date.now() - invokeStart,
+    overallScore: result.overallScore,
+    findingsCount: result.findings?.length ?? 0,
   });
 
   return result;
