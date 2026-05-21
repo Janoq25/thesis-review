@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,19 +13,14 @@ import { PlagiarismPanel } from '@/components/plagiarism/PlagiarismPanel';
 import { ReferencesPanel } from '@/components/references/ReferencesPanel';
 import { CheckCircle2, XCircle, Eye, Loader2, FileDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const STATUS_FLOW: Record<string, string[]> = {
-  PENDING: ['AI_PROCESSING'],
-  AI_PROCESSING: ['AI_COMPLETE'],
-  AI_COMPLETE: ['HUMAN_REVIEW', 'OBSERVED', 'APPROVED', 'REJECTED'],
-  HUMAN_REVIEW: ['OBSERVED', 'APPROVED', 'REJECTED'],
-  OBSERVED: ['APPROVED', 'REJECTED'],
-};
+import { useI18n } from '@/lib/i18n/context';
+import { useStatusConfig } from '@/lib/i18n/use-status-config';
 
 export default function ReviewPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const qc = useQueryClient();
+  const { t } = useI18n();
+  const { config: STATUS_CONFIG } = useStatusConfig();
   const [activeTab, setActiveTab] = useState('ai');
 
   const { data, isLoading } = useQuery({
@@ -77,35 +72,34 @@ export default function ReviewPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-64px)]">
       {/* Topbar */}
-      <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+      <div className="flex items-center justify-between px-5 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
         <div className="min-w-0">
-          <h1 className="text-sm font-medium text-gray-900 truncate">
-            {advance?.title ?? 'Revisión de avance'}
+          <h1 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+            {advance?.title ?? t('review.title')}
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             {advance?.student?.name} · {advance?.program?.name}
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Status badge */}
-          <span className={cn(
-            'text-xs font-medium px-2.5 py-1 rounded-full',
-            advance?.status === 'APPROVED' ? 'bg-green-50 text-green-700' :
-            advance?.status === 'REJECTED' ? 'bg-red-50 text-red-700' :
-            advance?.status === 'AI_PROCESSING' ? 'bg-purple-50 text-purple-700' :
-            'bg-blue-50 text-blue-700',
-          )}>
-            {advance?.status}
+          <span
+            className={cn(
+              'text-xs font-medium px-2.5 py-1 rounded-full',
+              STATUS_CONFIG[advance?.status ?? 'PENDING']?.className ?? STATUS_CONFIG.PENDING.className,
+            )}
+          >
+            {STATUS_CONFIG[advance?.status ?? 'PENDING']?.label ?? advance?.status}
           </span>
 
           <button
             onClick={downloadReport}
-            className="h-8 px-3 rounded-lg border border-gray-200 text-xs text-gray-600
-                       hover:bg-gray-50 flex items-center gap-1.5"
+            className="h-8 px-3 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-600 dark:text-gray-300
+                       hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-1.5"
           >
             <FileDown className="w-3.5 h-3.5" />
-            Reporte PDF
+            {t('review.downloadReport')}
           </button>
 
           {canReview && (
@@ -117,16 +111,16 @@ export default function ReviewPage() {
                            hover:bg-amber-50 flex items-center gap-1.5"
               >
                 <Eye className="w-3.5 h-3.5" />
-                Observar
+                {t('review.observe')}
               </button>
               <button
                 onClick={() => reviewMutation.mutate({ status: 'REJECTED' })}
                 disabled={reviewMutation.isPending}
-                className="h-8 px-3 rounded-lg border border-red-200 text-red-700 text-xs
-                           hover:bg-red-50 flex items-center gap-1.5"
+                className="h-8 px-3 rounded-lg border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs
+                           hover:bg-red-50 dark:hover:bg-red-950 flex items-center gap-1.5"
               >
                 <XCircle className="w-3.5 h-3.5" />
-                Rechazar
+                {t('review.reject')}
               </button>
               <button
                 onClick={() => reviewMutation.mutate({ status: 'APPROVED' })}
@@ -137,7 +131,7 @@ export default function ReviewPage() {
                 {reviewMutation.isPending
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   : <CheckCircle2 className="w-3.5 h-3.5" />}
-                Aprobar
+                {t('review.approve')}
               </button>
             </>
           )}
@@ -152,24 +146,24 @@ export default function ReviewPage() {
         </div>
 
         {/* Panel revisión */}
-        <div className="w-[420px] border-l border-gray-200 flex flex-col overflow-hidden bg-white">
+        <div className="w-[420px] border-l border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden bg-white dark:bg-gray-900">
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
             className="flex flex-col flex-1 overflow-hidden"
           >
-            <TabsList className="flex-shrink-0 rounded-none bg-white border-b border-gray-200 h-10 px-2">
-              <TabsTrigger value="ai" className="text-xs data-[state=active]:shadow-none">
-                Evaluación IA
+            <TabsList className="flex-shrink-0 rounded-none bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 h-10 px-2">
+              <TabsTrigger value="ai" className="text-xs data-[state=active]:shadow-none dark:text-gray-300">
+                {t('review.tabAi')}
               </TabsTrigger>
-              <TabsTrigger value="human" className="text-xs data-[state=active]:shadow-none">
-                Mi revisión
+              <TabsTrigger value="human" className="text-xs data-[state=active]:shadow-none dark:text-gray-300">
+                {t('review.tabHuman')}
               </TabsTrigger>
-              <TabsTrigger value="plagiarism" className="text-xs data-[state=active]:shadow-none">
-                Plagio
+              <TabsTrigger value="plagiarism" className="text-xs data-[state=active]:shadow-none dark:text-gray-300">
+                {t('review.tabPlagiarism')}
               </TabsTrigger>
-              <TabsTrigger value="references" className="text-xs data-[state=active]:shadow-none">
-                Referencias
+              <TabsTrigger value="references" className="text-xs data-[state=active]:shadow-none dark:text-gray-300">
+                {t('review.tabReferences')}
               </TabsTrigger>
             </TabsList>
 

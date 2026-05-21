@@ -187,7 +187,7 @@ interface AIEvaluationPanelProps {
   advanceId: string;
 }
 
-export function AIEvaluationPanel({ analysis, advanceId }: AIEvaluationPanelProps) {
+export function AIEvaluationPanel({ analysis }: AIEvaluationPanelProps) {
   const [filter, setFilter] = useState<string>('ALL');
 
   if (!analysis) {

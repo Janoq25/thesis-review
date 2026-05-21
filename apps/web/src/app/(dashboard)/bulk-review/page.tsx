@@ -6,7 +6,7 @@ import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { cn, formatDate } from '@/lib/utils';
-import { Layers, Loader2, CheckCircle2, XCircle, Eye } from 'lucide-react';
+import { Layers, Loader2, CheckCircle2, Eye } from 'lucide-react';
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   PENDING: { label: 'Pendiente', className: 'bg-gray-100 text-gray-700' },
