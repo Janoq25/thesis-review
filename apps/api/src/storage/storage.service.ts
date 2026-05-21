@@ -49,7 +49,18 @@ export class StorageService implements OnModuleInit {
   }
 
   async getPresignedUrl(key: string, expirySeconds = 3600): Promise<string> {
-    return this.client.presignedGetObject(this.bucket, key, expirySeconds);
+    // Generamos la URL firmada.
+    // Usamos un objeto vacío para params para evitar que se incluyan metadatos innecesarios 
+    // que causen el error "MetadataTooLarge".
+    const url = await this.client.presignedGetObject(this.bucket, key, expirySeconds);
+    
+    // Reemplazo de hostname para acceso desde el navegador (fuera de Docker)
+    const internalHost = process.env.MINIO_ENDPOINT ?? 'minio';
+    if (url.includes(`://${internalHost}:`)) {
+      return url.replace(`://${internalHost}:`, '://localhost:');
+    }
+    
+    return url;
   }
 
   async delete(key: string): Promise<void> {

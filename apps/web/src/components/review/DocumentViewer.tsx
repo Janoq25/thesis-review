@@ -10,132 +10,97 @@ interface DocumentViewerProps {
 }
 
 export function DocumentViewer({ advanceId }: DocumentViewerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [pdfDoc, setPdfDoc] = useState<any>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
-  const [scale, setScale] = useState(1.2);
-  const [isRendering, setIsRendering] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const { data: previewData, isLoading } = useQuery({
-    queryKey: ['advance-preview-url', advanceId],
-    queryFn: () => apiClient.get(`/advances/${advanceId}/preview-url`).then((r) => r.data),
+  const [fileType, setFileType] = useState<'pdf' | 'docx' | null>(null);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  
+  const { data: advance } = useQuery({
+    queryKey: ['advance-detail', advanceId],
+    queryFn: () => apiClient.get(`/advances/${advanceId}`).then((r) => r.data),
   });
 
-  // Cargar PDF.js desde CDN
-  useEffect(() => {
-    if (!previewData?.url) return;
+  const { isLoading } = useQuery({
+    queryKey: ['advance-file-blob', advanceId],
+    queryFn: async () => {
+      // Obtenemos el archivo a través de nuestra API para que use el token de autenticación
+      // y evitamos los problemas de cabeceras de MinIO.
+      const response = await apiClient.get(`/advances/${advanceId}/view`, {
+        responseType: 'blob'
+      });
+      const url = URL.createObjectURL(response.data);
+      setFileUrl(url);
+      return url;
+    },
+    staleTime: Infinity,
+  });
 
-    const loadPdf = async () => {
-      // Importar PDF.js dinámicamente
-      const pdfjsLib = (window as any)['pdfjs-dist/build/pdf'];
-      if (!pdfjsLib) {
-        // Cargar script si no está disponible
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-        script.onload = () => loadPdf();
-        document.head.appendChild(script);
-        return;
+  useEffect(() => {
+    if (advance?.fileType) {
+      setFileType(advance.fileType);
+    }
+  }, [advance]);
+
+  // Limpiar el blob URL cuando se desmonte el componente
+  useEffect(() => {
+    return () => {
+      if (fileUrl) {
+        URL.revokeObjectURL(fileUrl);
       }
-
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-      const doc = await pdfjsLib.getDocument(previewData.url).promise;
-      setPdfDoc(doc);
-      setTotalPages(doc.numPages);
     };
-
-    loadPdf();
-  }, [previewData?.url]);
-
-  // Renderizar página
-  useEffect(() => {
-    if (!pdfDoc || !canvasRef.current || isRendering) return;
-
-    const renderPage = async () => {
-      setIsRendering(true);
-      const page = await pdfDoc.getPage(currentPage);
-      const viewport = page.getViewport({ scale });
-      const canvas = canvasRef.current!;
-      const ctx = canvas.getContext('2d')!;
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      setIsRendering(false);
-    };
-
-    renderPage();
-  }, [pdfDoc, currentPage, scale]);
+  }, [fileUrl]);
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-100">
+      <div className="flex-1 flex items-center justify-center bg-gray-100 h-full">
         <div className="flex flex-col items-center gap-3 text-gray-500">
           <Loader2 className="w-8 h-8 animate-spin" />
-          <p className="text-sm">Cargando documento...</p>
+          <p className="text-sm">Preparando visor seguro...</p>
         </div>
       </div>
     );
   }
 
+  if (!fileUrl) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-gray-50 h-full border-r border-gray-200">
+        <p className="text-sm text-gray-400">No se pudo cargar la vista previa</p>
+      </div>
+    );
+  }
+
+  // Si es PDF, usamos el visor nativo del navegador
+  if (fileType === 'pdf') {
+    return (
+      <div className="flex flex-col h-full bg-gray-50 border-r border-gray-200">
+        <iframe
+          src={`${fileUrl}#toolbar=0`}
+          className="w-full h-full border-none"
+          title="Visor PDF"
+        />
+      </div>
+    );
+  }
+
+  // Si es DOCX, los visores externos como Google Docs no funcionan con URLs locales (localhost o blob).
+  // Por lo tanto, mostramos una interfaz para descargarlo o abrirlo externamente.
   return (
-    <div className="flex flex-col h-full bg-gray-100">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-200 flex-shrink-0">
-        <button
-          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-          disabled={currentPage <= 1}
-          className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        <span className="text-xs text-gray-600 min-w-[80px] text-center">
-          {currentPage} / {totalPages}
-        </span>
-        <button
-          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-          disabled={currentPage >= totalPages}
-          className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-        <div className="w-px h-4 bg-gray-200 mx-1" />
-        <button
-          onClick={() => setScale((s) => Math.min(2.5, s + 0.2))}
-          className="p-1 rounded hover:bg-gray-100"
+    <div className="flex flex-col h-full bg-gray-50 border-r border-gray-200 items-center justify-center p-6 text-center">
+      <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm max-w-sm w-full">
+        <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Documento Word</h3>
+        <p className="text-sm text-gray-500 mb-6">
+          La vista previa integrada solo está disponible para archivos PDF. Por favor, descarga el documento para revisarlo.
+        </p>
+        <a
+          href={`/api/v1/advances/${advanceId}/download`}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#185FA5] text-white text-sm font-medium rounded-lg hover:bg-[#0C447C] transition-colors w-full"
         >
           <ZoomIn className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => setScale((s) => Math.max(0.5, s - 0.2))}
-          className="p-1 rounded hover:bg-gray-100"
-        >
-          <ZoomOut className="w-4 h-4" />
-        </button>
-        <span className="text-xs text-gray-400 ml-1">{Math.round(scale * 100)}%</span>
-
-        <div className="ml-auto flex items-center gap-2">
-          <a
-            href={`/api/advances/${advanceId}/download`}
-            className="text-xs text-[#185FA5] hover:underline"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Descargar
-          </a>
-        </div>
-      </div>
-
-      {/* Canvas */}
-      <div ref={containerRef} className="flex-1 overflow-auto flex justify-center p-4">
-        {isRendering && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/50 z-10">
-            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-          </div>
-        )}
-        <canvas ref={canvasRef} className="shadow-lg" />
+          Descargar Documento
+        </a>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import PDFDocument from 'pdfkit';
 
 @Injectable()
 export class PdfReportService {
@@ -19,19 +20,63 @@ export class PdfReportService {
       },
     });
 
-    // Generar HTML básico
-    const html = `
-      <html><body>
-        <h1>Reporte de Avance: ${advance.title}</h1>
-        <p>Estudiante: ${advance.student.name}</p>
-        <p>Programa: ${advance.program.name}</p>
-        <p>Estado: ${advance.status}</p>
-      </body></html>
-    `;
+    this.logger.log(`Generando reporte PDF profesional para avance ${advanceId}`);
 
-    // TODO: Usar puppeteer cuando esté instalado
-    this.logger.log(`Generando reporte PDF para avance ${advanceId}`);
-    return Buffer.from(html, 'utf-8');
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const chunks: Buffer[] = [];
+
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      // --- Encabezado ---
+      doc.fontSize(20).text('REPORTE DE EVALUACIÓN DE TESIS', { align: 'center' });
+      doc.moveDown();
+      
+      // --- Información General ---
+      doc.fontSize(12).font('Helvetica-Bold').text('Información del Avance');
+      doc.font('Helvetica').fontSize(10);
+      doc.text(`Título: ${advance.title}`);
+      doc.text(`Estudiante: ${advance.student.name}`);
+      doc.text(`Programa: ${advance.program.name}`);
+      doc.text(`Tipo: ${advance.advanceType}`);
+      doc.text(`Versión: v${advance.version}`);
+      doc.text(`Fecha: ${new Date().toLocaleDateString()}`);
+      doc.moveDown();
+
+      // --- Resultados de la IA ---
+      if (advance.aiAnalysis) {
+        doc.fontSize(12).font('Helvetica-Bold').text('Resultados de Evaluación IA');
+        doc.font('Helvetica').fontSize(10);
+        doc.text(`Puntaje de Estructura: ${advance.aiAnalysis.structureScore}%`);
+        doc.text(`Puntaje de Contenido: ${advance.aiAnalysis.contentScore}%`);
+        doc.text(`Puntaje de Forma: ${advance.aiAnalysis.formScore}%`);
+        doc.text(`Puntaje de Originalidad: ${advance.aiAnalysis.originalityScore}%`);
+        doc.moveDown();
+        doc.fontSize(14).fillColor('#185FA5').text(`NOTA CONVERTIDA: ${advance.aiAnalysis.gradeConverted.toFixed(1)} / 20`);
+        doc.fillColor('black');
+        doc.moveDown();
+
+        doc.fontSize(12).font('Helvetica-Bold').text('Hallazgos Detectados');
+        advance.aiAnalysis.findings.forEach((finding, i) => {
+          doc.moveDown(0.5);
+          doc.fontSize(10).font('Helvetica-Bold').text(`${i + 1}. [${finding.severity}] ${finding.sectionRef}`);
+          doc.font('Helvetica').text(finding.description);
+          doc.fontSize(9).fillColor('#666666').text(`Sugerencia: ${finding.recommendation}`);
+          doc.fillColor('black');
+        });
+      }
+
+      // --- Resumen Ejecutivo ---
+      if (advance.aiAnalysis?.executiveSummary) {
+        doc.addPage();
+        doc.fontSize(12).font('Helvetica-Bold').text('Resumen Ejecutivo');
+        doc.font('Helvetica').fontSize(10).text(advance.aiAnalysis.executiveSummary);
+      }
+
+      doc.end();
+    });
   }
 
   async generateVersionsComparison(advanceId: string): Promise<Buffer> {

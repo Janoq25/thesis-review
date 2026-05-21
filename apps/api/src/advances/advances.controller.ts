@@ -115,6 +115,23 @@ export class AdvancesController {
     return new StreamableFile(buffer);
   }
 
+  @Get(':id/view')
+  async view(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { buffer, contentType, filename } =
+      await this.advancesService.downloadFile(id);
+
+    res.set({
+      'Content-Type': contentType,
+      'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
+      'Content-Length': buffer.length,
+    });
+
+    return new StreamableFile(buffer);
+  }
+
   @Get(':id/preview-url')
   async previewUrl(@Param('id') id: string) {
     const advance = await this.advancesService['prisma'].advance.findUniqueOrThrow({
