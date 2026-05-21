@@ -65,6 +65,18 @@ export const aiWorker = new Worker(
         throw new Error(`Texto extraído demasiado corto (${text.trim().length} caracteres)`);
       }
 
+      // Guardar el texto en chunks (un solo chunk por ahora para simplicidad)
+      await prisma.advanceChunk.deleteMany({ where: { advanceId } });
+      await prisma.advanceChunk.create({
+        data: {
+          advanceId,
+          sectionName: 'FULL_TEXT',
+          content: text,
+          chunkIndex: 0,
+        },
+      });
+      jobLog(SCOPE, 'Texto guardado en AdvanceChunk', { advanceId });
+
       jobLog(SCOPE, 'Llamando Azure OpenAI (analyzeDocument)', {
         advanceId,
         deployment:

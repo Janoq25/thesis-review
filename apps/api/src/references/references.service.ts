@@ -1,269 +1,144 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { AzureChatOpenAI } from '@langchain/openai';
 import { createAzureChatLLM } from '../common/azure-openai.config';
+import { extractText } from '@thesis-review/ai-engine';
+import { z } from 'zod';
 
-interface ExtractedReference {
-  rawText: string;
-  authors: string | null;
-  year: number | null;
-  title: string | null;
-  journal: string | null;
-  volume: string | null;
-  issue: string | null;
-  doi: string | null;
-  url: string | null;
-}
-
-interface CrossRefWork {
-  DOI?: string;
-  title?: string[];
-  author?: Array<{ family: string; given: string }>;
-  issued?: { 'date-parts': number[][] };
-  'container-title'?: string[];
-  volume?: string;
-  issue?: string;
-  score?: number;
-}
+const referenceAnalysisSchema = z.object({
+  references: z.array(z.object({
+    rawText: z.string().describe("El texto original completo de la referencia tal cual aparece en el documento"),
+    title: z.string().nullable().optional().default(null),
+    authors: z.string().nullable().optional().default(null),
+    year: z.number().nullable().optional().default(null),
+    doi: z.string().nullable().optional().default(null),
+    status: z.enum(['VERIFIED', 'DOI_MISSING', 'POSSIBLE_HALLUCINATION', 'NOT_FOUND', 'DOI_INCORRECT', 'UNINDEXED'])
+      .default('NOT_FOUND')
+      .describe("Clasificación del estado de la referencia. Usa VERIFIED si está bien estructurada APA 7. Usa DOI_MISSING si es válida pero falta DOI. Usa POSSIBLE_HALLUCINATION si parece falsa o mal construida. Usa NOT_FOUND si está demasiado incompleta."),
+    issues: z.array(z.string()).default([]).describe("Lista de errores observados en la referencia según APA 7. Ej: 'Falta cursiva en la revista', 'Falta número de páginas'"),
+    suggestion: z.string().nullable().optional().default(null).describe("Sugerencia de cómo debería redactarse correctamente esta referencia")
+  }))
+});
 
 @Injectable()
 export class CrossRefService {
   private readonly logger = new Logger(CrossRefService.name);
   private llm: AzureChatOpenAI;
-  private readonly CROSSREF_BASE = 'https://api.crossref.org/works';
-  private readonly SIMILARITY_THRESHOLD = 0.75;
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private storage: StorageService,
+  ) {
     this.llm = createAzureChatLLM(
-      process.env.AZURE_OPENAI_CHAT_MINI_DEPLOYMENT ?? 'gpt-4o-mini',
+      process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ?? process.env.AZURE_OPENAI_DEPLOYMENT_NAME ?? 'gpt-4o',
     );
   }
 
   async analyzeReferences(advanceId: string, documentText: string): Promise<void> {
-    // 1. Extraer referencias con IA
-    const extracted = await this.extractReferencesWithAI(documentText);
+    this.logger.log(`Iniciando análisis de referencias IA One-Shot para avance ${advanceId}`);
+    
+    let textToAnalyze = documentText;
 
-    // 2. Crear análisis base
-    const analysis = await this.prisma.referenceAnalysis.create({
-      data: { advanceId },
+    // FALLBACK: Si no hay texto (chunks vacíos), intentar extraerlo del archivo original
+    if (!textToAnalyze || textToAnalyze.trim().length < 50) {
+      this.logger.warn(`DocumentText vacío para avance ${advanceId}. Intentando extracción de emergencia desde el archivo.`);
+      try {
+        const advance = await this.prisma.advance.findUniqueOrThrow({ where: { id: advanceId } });
+        const buffer = await this.storage.download(advance.fileKey);
+        textToAnalyze = await extractText(buffer, advance.fileType as any);
+        this.logger.log(`Extracción de emergencia exitosa: ${textToAnalyze.length} caracteres.`);
+        
+        // Guardar para la próxima vez
+        await this.prisma.advanceChunk.create({
+          data: {
+            advanceId,
+            sectionName: 'EMERGENCY_FULL_TEXT',
+            content: textToAnalyze,
+            chunkIndex: 0,
+          }
+        });
+      } catch (err) {
+        this.logger.error(`Fallo crítico en extracción de emergencia para ${advanceId}`, err);
+        throw new Error('No se pudo recuperar el texto del documento para el análisis.');
+      }
+    }
+
+    let analysis = await this.prisma.referenceAnalysis.findUnique({
+      where: { advanceId },
     });
 
-    // 3. Verificar cada referencia contra CrossRef
-    const results = await Promise.allSettled(
-      extracted.map((ref) => this.verifyReference(ref)),
-    );
+    if (!analysis) {
+      analysis = await this.prisma.referenceAnalysis.create({
+        data: { advanceId },
+      });
+    } else {
+      await this.prisma.reference.deleteMany({
+        where: { analysisId: analysis.id },
+      });
+    }
 
-    const references = results.map((result, i) => {
-      if (result.status === 'fulfilled') return result.value;
-      // En caso de error de red, marcar como no verificada
-      return {
-        ...extracted[i],
-        status: 'NOT_FOUND' as const,
-        errorType: 'network_error',
-        suggestion: 'No se pudo verificar por error de conexión',
-        crossrefData: null,
-      };
-    });
+    const bibIndex = textToAnalyze.search(/referencias\s+bibliográficas?|bibliografía|references/i);
+    let bibSection = bibIndex !== -1 ? textToAnalyze.slice(bibIndex) : textToAnalyze.slice(-10000);
 
-    // 4. Guardar referencias individuales
-    const verifiedCount = references.filter((r) => r.status === 'VERIFIED').length;
-    const errorCount = references.filter(
-      (r) => r.status !== 'VERIFIED',
-    ).length;
+    // Si la sección de bibliografía es muy corta, intentar con los últimos 15000 caracteres
+    if (bibSection.length < 500) {
+      this.logger.warn(`Sección de bibliografía muy corta (${bibSection.length} chars). Usando fallback de los últimos 15000.`);
+      bibSection = textToAnalyze.slice(-15000);
+    }
 
-    await this.prisma.reference.createMany({
-      data: references.map((ref) => ({
-        analysisId: analysis.id,
+    this.logger.log(`Longitud del texto para análisis: ${bibSection.length} caracteres.`);
+
+    const prompt = `
+      Eres un experto en bibliografía académica y normativas APA 7.
+      Tu tarea es extraer TODAS las referencias bibliográficas del texto y analizarlas individualmente.
+      
+      INSTRUCCIONES OBLIGATORIAS:
+      1. Extrae cada referencia del texto.
+      2. Para CADA referencia, debes completar TODOS los campos del JSON. No omitas ningún campo.
+      3. Si no encuentras un dato (como DOI o Año), pon null, pero mantén el campo en el objeto.
+      4. Evalúa la calidad: ¿Cumple con APA 7? ¿Los autores parecen reales? ¿Tiene DOI?
+      
+      CAMPOS POR REFERENCIA:
+      - rawText: Texto original.
+      - status: Uno de ['VERIFIED', 'DOI_MISSING', 'POSSIBLE_HALLUCINATION', 'NOT_FOUND', 'DOI_INCORRECT', 'UNINDEXED'].
+      - issues: Array de strings con errores encontrados. Si no hay, array vacío [].
+      - suggestion: Texto con la referencia corregida según APA 7.
+      
+      Devuelve el resultado estrictamente en formato JSON.
+      
+      TEXTO A ANALIZAR:
+      ${bibSection.substring(0, 20000)}
+    `;
+
+    try {
+      const structuredLlm = this.llm.withStructuredOutput(referenceAnalysisSchema, {
+        name: 'reference_analysis'
+      });
+
+      const result = await structuredLlm.invoke(prompt);
+
+      const referencesData = result.references.map((ref) => ({
+        analysisId: analysis!.id,
         rawText: ref.rawText,
         authors: ref.authors ?? null,
         year: ref.year ?? null,
         title: ref.title ?? null,
         doi: ref.doi ?? null,
+        status: ref.status as any,
         verified: ref.status === 'VERIFIED',
-        crossrefData: ref.crossrefData ?? undefined,
-        issues: ref.errorType ? [ref.errorType] : [],
-      })),
-    });
+        issues: ref.issues ?? [],
+        crossrefData: ref.suggestion ? { suggestion: ref.suggestion } : {},
+      }));
 
-    this.logger.log(
-      `Referencias verificadas — avance ${advanceId}: ${verifiedCount}/${extracted.length} OK, ${errorCount} errores`,
-    );
-  }
+      await this.prisma.reference.createMany({
+        data: referencesData,
+      });
 
-  private async extractReferencesWithAI(text: string): Promise<ExtractedReference[]> {
-    // Buscar la sección de bibliografía en el texto
-    const bibIndex = text.search(
-      /referencias\s+bibliográficas?|bibliografía|references/i,
-    );
-    const bibSection = bibIndex !== -1
-      ? text.slice(bibIndex, bibIndex + 6000)
-      : text.slice(-4000); // fallback: últimas 4000 chars
-
-    // MOCK: En lugar de usar la API de OpenAI, devolvemos referencias de prueba
-    this.logger.log('Utilizando MOCK para extracción de referencias');
-    
-    // Simular latencia de red
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    return [
-      {
-        rawText: "Goodfellow, I., Bengio, Y., & Courville, A. (2016). Deep Learning. MIT Press.",
-        authors: "Goodfellow, I., Bengio, Y., & Courville, A.",
-        year: 2016,
-        title: "Deep Learning",
-        journal: null,
-        volume: null,
-        issue: null,
-        doi: null,
-        url: "http://www.deeplearningbook.org"
-      },
-      {
-        rawText: "Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., ... & Polosukhin, I. (2017). Attention is all you need. Advances in neural information processing systems, 30.",
-        authors: "Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., ... & Polosukhin, I.",
-        year: 2017,
-        title: "Attention is all you need",
-        journal: "Advances in neural information processing systems",
-        volume: "30",
-        issue: null,
-        doi: "10.48550/arXiv.1706.03762",
-        url: "https://arxiv.org/abs/1706.03762"
-      }
-    ];
-  }
-
-  private async verifyReference(ref: ExtractedReference): Promise<
-    ExtractedReference & {
-      status: string;
-      errorType?: string;
-      suggestion?: string;
-      crossrefData?: any;
+      this.logger.log(`Análisis completado — avance ${advanceId}: ${result.references.length} referencias procesadas.`);
+    } catch (error) {
+      this.logger.error('Error durante el análisis estructurado de IA', error);
+      throw new Error('No se pudieron analizar las referencias con IA.');
     }
-  > {
-    // Si tiene DOI, verificar directamente
-    if (ref.doi) {
-      return this.verifyByDOI(ref);
-    }
-    // Si no tiene DOI, buscar por título + autor
-    if (ref.title) {
-      return this.verifyByQuery(ref);
-    }
-    return { ...ref, status: 'DOI_MISSING', errorType: 'no_doi', suggestion: 'Busque el DOI en https://doi.org' };
-  }
-
-  private async verifyByDOI(ref: ExtractedReference) {
-    const cleanDoi = ref.doi!.replace(/^https?:\/\/doi\.org\//i, '');
-
-    const res = await fetch(`${this.CROSSREF_BASE}/${encodeURIComponent(cleanDoi)}`, {
-      headers: { 'User-Agent': 'ThesisReviewSystem/1.0 (mailto:admin@university.edu)' },
-    });
-
-    if (res.status === 404) {
-      // DOI no existe — buscar por título para sugerir DOI correcto
-      const suggestion = await this.findCorrectDOI(ref);
-      return {
-        ...ref,
-        status: 'DOI_INCORRECT' as const,
-        errorType: 'doi_not_found',
-        suggestion,
-        crossrefData: null,
-      };
-    }
-
-    const data: { message: CrossRefWork } = await res.json();
-    const work = data.message;
-
-    // Verificar que el año y título coincidan razonablemente
-    const workYear = work.issued?.['date-parts']?.[0]?.[0];
-    if (ref.year && workYear && Math.abs(workYear - ref.year) > 1) {
-      return {
-        ...ref,
-        status: 'DOI_INCORRECT' as const,
-        errorType: 'wrong_year',
-        suggestion: `El DOI corresponde al año ${workYear}, no ${ref.year}. Verificar edición correcta.`,
-        crossrefData: work,
-      };
-    }
-
-    return { ...ref, status: 'VERIFIED' as const, crossrefData: work };
-  }
-
-  private async verifyByQuery(ref: ExtractedReference) {
-    const query = [ref.title, ref.authors].filter(Boolean).join(' ').substring(0, 120);
-
-    const res = await fetch(
-      `${this.CROSSREF_BASE}?query=${encodeURIComponent(query)}&rows=3&select=DOI,title,author,issued,container-title,score`,
-      { headers: { 'User-Agent': 'ThesisReviewSystem/1.0 (mailto:admin@university.edu)' } },
-    );
-
-    if (!res.ok) {
-      return { ...ref, status: 'NOT_FOUND' as const, errorType: 'api_error', crossrefData: null };
-    }
-
-    const data: { message: { items: CrossRefWork[] } } = await res.json();
-    const best = data.message.items[0];
-
-    if (!best || (best.score ?? 0) < 50) {
-      return {
-        ...ref,
-        status: 'POSSIBLE_HALLUCINATION' as const,
-        errorType: 'not_found_in_crossref',
-        suggestion:
-          'Esta referencia no fue encontrada en CrossRef. Verifique que el título y autores sean exactos, o que la fuente exista realmente.',
-        crossrefData: null,
-      };
-    }
-
-    // Verificar similitud de título
-    const crossrefTitle = best.title?.[0] ?? '';
-    const titleSimilarity = this.cosineSimilaritySimple(
-      ref.title ?? '',
-      crossrefTitle,
-    );
-
-    if (titleSimilarity < this.SIMILARITY_THRESHOLD) {
-      return {
-        ...ref,
-        status: 'NOT_FOUND' as const,
-        errorType: 'low_title_match',
-        suggestion: `Título más parecido en CrossRef: "${crossrefTitle}" (DOI: ${best.DOI})`,
-        crossrefData: best,
-      };
-    }
-
-    // Verificar si el journal está indexado (tiene DOI = sí lo está)
-    if (!best.DOI) {
-      return { ...ref, status: 'UNINDEXED' as const, errorType: 'unindexed_journal', crossrefData: best };
-    }
-
-    return {
-      ...ref,
-      doi: best.DOI,
-      status: 'VERIFIED' as const,
-      suggestion: `DOI encontrado: ${best.DOI}`,
-      crossrefData: best,
-    };
-  }
-
-  private async findCorrectDOI(ref: ExtractedReference): Promise<string> {
-    if (!ref.title) return 'Busque el DOI en https://doi.org';
-    const query = [ref.title, ref.authors].filter(Boolean).join(' ').substring(0, 100);
-    const res = await fetch(
-      `${this.CROSSREF_BASE}?query=${encodeURIComponent(query)}&rows=1&select=DOI,title`,
-    );
-    if (!res.ok) return 'Error al buscar DOI alternativo';
-    const data: { message: { items: CrossRefWork[] } } = await res.json();
-    const item = data.message.items[0];
-    return item?.DOI
-      ? `DOI sugerido: ${item.DOI} — Título: "${item.title?.[0]}"`
-      : 'No se encontró DOI alternativo. Verifique manualmente.';
-  }
-
-  // Similitud simple por jaccard de palabras (sin embeddings para ahorrar costo)
-  private cosineSimilaritySimple(a: string, b: string): number {
-    const wordsA = new Set(a.toLowerCase().split(/\s+/).filter((w) => w.length > 3));
-    const wordsB = new Set(b.toLowerCase().split(/\s+/).filter((w) => w.length > 3));
-    const intersection = [...wordsA].filter((w) => wordsB.has(w)).length;
-    const union = new Set([...wordsA, ...wordsB]).size;
-    return union === 0 ? 0 : intersection / union;
   }
 }
