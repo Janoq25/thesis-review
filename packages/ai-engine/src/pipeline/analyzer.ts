@@ -63,6 +63,7 @@ export async function analyzeDocument(
       'gpt-4o',
     azureOpenAIApiVersion: process.env.AZURE_OPENAI_API_VERSION ?? '2024-08-01-preview',
     temperature: 0.1, 
+    maxRetries: 10,
   });
 
   const structuredLlm = llm.withStructuredOutput(analysisSchema, {

@@ -89,6 +89,9 @@ export const aiWorker = new Worker(
       const result = await analyzeDocument(text, advance.template.rubric, advance.advanceType);
       const processingMs = Date.now() - aiStart;
 
+      // Enfriamiento de 3 segundos para evitar spikes de consumo de tokens en OpenAI
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
       jobLog(SCOPE, 'Respuesta de IA recibida', {
         advanceId,
         processingMs,
@@ -159,7 +162,7 @@ export const aiWorker = new Worker(
   },
   {
     connection: getRedisConnection(),
-    concurrency: 2,
+    concurrency: 1,
   },
 );
 

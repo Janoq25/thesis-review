@@ -9,19 +9,18 @@ import { Upload, FileText, X, CheckCircle2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const PIPELINE_STEPS = [
-  'Subiendo archivo...',
-  'Extrayendo texto (mammoth.js / pdf-parse)...',
-  'Segmentando en chunks (LangChain.js)...',
-  'Generando embeddings (text-embedding-3-large)...',
-  'Comparando con documento patrón...',
-  'Analizando con GPT-4o...',
-  'Guardando hallazgos...',
-  'Análisis completado',
+  'Subiendo archivos en bloque...',
+  'Extrayendo textos en paralelo (pdf-parse / mammoth)...',
+  'Segmentando documentos en chunks...',
+  'Generando embeddings vectoriales...',
+  'Preparando cola de análisis IA...',
+  'Iniciando procesamiento secuencial con GPT-4o...',
+  'Lote procesado exitosamente',
 ];
 
 export default function UploadPage() {
   const router = useRouter();
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [programId, setProgramId] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [advanceType, setAdvanceType] = useState('chapter_1');
@@ -41,16 +40,15 @@ export default function UploadPage() {
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      // Simular progreso del pipeline
       let step = 0;
       const interval = setInterval(() => {
         if (step < PIPELINE_STEPS.length - 2) {
           setPipelineStep(step++);
         }
-      }, 1200);
+      }, 1500);
 
       try {
-        const result = await apiClient.post('/advances', formData, {
+        const result = await apiClient.post('/advances/bulk', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         clearInterval(interval);
@@ -61,34 +59,40 @@ export default function UploadPage() {
         throw err;
       }
     },
-    onSuccess: (data) => {
-      toast.success('Avance cargado. Análisis IA iniciado en background.');
-      setTimeout(() => router.push(`/advances/${data.id}/review`), 1500);
+    onSuccess: () => {
+      toast.success('Archivos cargados en lote con éxito. Análisis en cola iniciado.');
+      setTimeout(() => router.push('/advances'), 2000);
     },
     onError: (err: any) => {
       setPipelineStep(-1);
-      toast.error(err.response?.data?.message ?? 'Error al subir el archivo');
+      toast.error(err.response?.data?.message ?? 'Error al subir los archivos');
     },
   });
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    const dropped = e.dataTransfer.files[0];
-    if (dropped && (dropped.type.includes('pdf') || dropped.name.endsWith('.docx'))) {
-      setFile(dropped);
-    } else {
-      toast.error('Solo se aceptan archivos PDF o Word (.docx)');
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    const validFiles = droppedFiles.filter(
+      (f) => f.type.includes('pdf') || f.name.endsWith('.docx')
+    );
+    if (validFiles.length > 0) {
+      setFiles((prev) => [...prev, ...validFiles]);
+    }
+    if (validFiles.length < droppedFiles.length) {
+      toast.error('Algunos archivos fueron omitidos. Solo se aceptan PDF o Word (.docx)');
     }
   }, []);
 
   const handleSubmit = () => {
-    if (!file || !programId || !templateId) {
+    if (files.length === 0 || !programId || !templateId) {
       toast.error('Complete todos los campos');
       return;
     }
     const fd = new FormData();
-    fd.append('file', file);
+    files.forEach((f) => {
+      fd.append('files', f);
+    });
     fd.append('programId', programId);
     fd.append('templateId', templateId);
     fd.append('advanceType', advanceType);
@@ -112,43 +116,62 @@ export default function UploadPage() {
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
-            onClick={() => !file && document.getElementById('file-input')?.click()}
+            onClick={() => files.length === 0 && document.getElementById('file-input')?.click()}
             className={cn(
-              'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors',
+              'border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors',
               isDragging ? 'border-[#185FA5] bg-blue-50' : 'border-gray-200 hover:border-gray-300',
-              file && 'cursor-default',
+              files.length > 0 && 'cursor-default',
             )}
           >
             <input
               id="file-input"
               type="file"
               accept=".pdf,.docx"
+              multiple
               className="hidden"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const selected = Array.from(e.target.files ?? []);
+                setFiles((prev) => [...prev, ...selected]);
+              }}
             />
-            {file ? (
-              <div className="flex items-center justify-center gap-3">
-                <FileText className="w-8 h-8 text-[#185FA5]" />
-                <div className="text-left">
-                  <p className="text-sm font-medium text-gray-900">{file.name}</p>
-                  <p className="text-xs text-gray-500">
-                    {(file.size / 1024 / 1024).toFixed(1)} MB
-                  </p>
+            {files.length > 0 ? (
+              <div className="space-y-2 text-left max-h-48 overflow-y-auto">
+                <p className="text-xs font-semibold text-gray-500 mb-2">Archivos seleccionados ({files.length}):</p>
+                {files.map((file, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-3 bg-white p-2 rounded-lg border border-gray-150 shadow-sm">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <FileText className="w-5 h-5 text-[#185FA5] flex-shrink-0" />
+                      <span className="text-xs font-medium text-gray-900 truncate">{file.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-[10px] text-gray-500 font-mono">
+                        {(file.size / 1024 / 1024).toFixed(1)} MB
+                      </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setFiles((prev) => prev.filter((_, i) => i !== idx)); }}
+                        className="text-gray-400 hover:text-red-500 p-1"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <div className="pt-2 text-center">
+                  <button
+                    onClick={() => document.getElementById('file-input')?.click()}
+                    className="text-xs font-semibold text-[#185FA5] hover:text-[#0C447C] inline-flex items-center gap-1 bg-blue-50 px-3 py-1.5 rounded-lg border border-[#185FA5]/20"
+                  >
+                    + Agregar más archivos
+                  </button>
                 </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                  className="text-gray-400 hover:text-red-500 ml-2"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
             ) : (
               <>
                 <Upload className="w-8 h-8 text-gray-400 mx-auto mb-3" />
                 <p className="text-sm font-medium text-gray-700">
-                  Arrastra o haz clic para seleccionar
+                  Arrastra o haz clic para seleccionar archivos
                 </p>
-                <p className="text-xs text-gray-400 mt-1">Word (.docx) o PDF · máx. 50 MB</p>
+                <p className="text-xs text-gray-400 mt-1">Word (.docx) o PDF · puedes seleccionar varios</p>
               </>
             )}
           </div>
@@ -201,7 +224,7 @@ export default function UploadPage() {
 
           <button
             onClick={handleSubmit}
-            disabled={uploadMutation.isPending || !file || !programId || !templateId}
+            disabled={uploadMutation.isPending || files.length === 0 || !programId || !templateId}
             className="w-full h-10 rounded-lg bg-[#185FA5] hover:bg-[#0C447C] text-white
                        text-sm font-medium disabled:opacity-50 transition-colors
                        flex items-center justify-center gap-2"
