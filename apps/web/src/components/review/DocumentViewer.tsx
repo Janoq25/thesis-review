@@ -61,13 +61,19 @@ export function DocumentViewer({ advanceId }: DocumentViewerProps) {
     staleTime: Infinity,
   });
 
-  // Limpiar los blob URLs cuando se desmonte el componente
+  // Limpiar el blob URL del archivo original al cambiar o desmontar
   useEffect(() => {
     return () => {
       if (fileUrl) URL.revokeObjectURL(fileUrl);
+    };
+  }, [fileUrl]);
+
+  // Limpiar el blob URL del reporte resaltado al cambiar o desmontar
+  useEffect(() => {
+    return () => {
       if (highlightedUrl) URL.revokeObjectURL(highlightedUrl);
     };
-  }, [fileUrl, highlightedUrl]);
+  }, [highlightedUrl]);
 
   if (isLoading) {
     return (
