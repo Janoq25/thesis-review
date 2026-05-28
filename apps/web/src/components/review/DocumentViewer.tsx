@@ -39,14 +39,35 @@ export function DocumentViewer({ advanceId }: DocumentViewerProps) {
     }
   }, [advance]);
 
-  // Limpiar el blob URL cuando se desmonte el componente
+  const [highlightedUrl, setHighlightedUrl] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'original' | 'highlighted'>('original');
+
+  const { data: plagiarismReport } = useQuery({
+    queryKey: ['plagiarism-report', advanceId],
+    queryFn: () => apiClient.get(`/plagiarism/report/${advanceId}`).then((r) => r.data),
+  });
+
+  useQuery({
+    queryKey: ['advance-highlighted-blob', advanceId],
+    queryFn: async () => {
+      const response = await apiClient.get(`/plagiarism/report/${advanceId}/view`, {
+        responseType: 'blob'
+      });
+      const url = URL.createObjectURL(response.data);
+      setHighlightedUrl(url);
+      return url;
+    },
+    enabled: !!plagiarismReport?.copyleaksReportKey,
+    staleTime: Infinity,
+  });
+
+  // Limpiar los blob URLs cuando se desmonte el componente
   useEffect(() => {
     return () => {
-      if (fileUrl) {
-        URL.revokeObjectURL(fileUrl);
-      }
+      if (fileUrl) URL.revokeObjectURL(fileUrl);
+      if (highlightedUrl) URL.revokeObjectURL(highlightedUrl);
     };
-  }, [fileUrl]);
+  }, [fileUrl, highlightedUrl]);
 
   if (isLoading) {
     return (
@@ -67,15 +88,58 @@ export function DocumentViewer({ advanceId }: DocumentViewerProps) {
     );
   }
 
-  // Si es PDF, usamos el visor nativo del navegador
+  // Si es PDF, usamos el visor nativo del navegador (con soporte de alternancia de reportes)
   if (fileType === 'pdf') {
+    const showToggle = !!plagiarismReport?.copyleaksReportKey;
+    const currentUrl = viewMode === 'original' ? fileUrl : highlightedUrl;
+    const isReportLoading = viewMode === 'highlighted' && !highlightedUrl;
+
     return (
       <div className="flex flex-col h-full bg-gray-50 border-r border-gray-200">
-        <iframe
-          src={`${fileUrl}#toolbar=0`}
-          className="w-full h-full border-none"
-          title="Visor PDF"
-        />
+        {showToggle && (
+          <div className="flex items-center justify-between px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+              Modo de Visualización:
+            </span>
+            <div className="flex bg-gray-200 dark:bg-gray-700 p-0.5 rounded-lg">
+              <button
+                onClick={() => setViewMode('original')}
+                className={`text-xs px-3 py-1 rounded-md font-medium transition-all ${
+                  viewMode === 'original'
+                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900'
+                }`}
+              >
+                Documento Original
+              </button>
+              <button
+                onClick={() => setViewMode('highlighted')}
+                className={`text-xs px-3 py-1 rounded-md font-medium transition-all ${
+                  viewMode === 'highlighted'
+                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900'
+                }`}
+              >
+                Reporte Turnitin (IA/Plagio)
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {isReportLoading ? (
+          <div className="flex-1 flex items-center justify-center bg-gray-50">
+            <div className="flex flex-col items-center gap-3 text-gray-500">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+              <p className="text-xs">Descargando reporte de marcas de Copyleaks...</p>
+            </div>
+          </div>
+        ) : (
+          <iframe
+            src={`${currentUrl}#toolbar=0`}
+            className="w-full h-full border-none"
+            title="Visor PDF"
+          />
+        )}
       </div>
     );
   }

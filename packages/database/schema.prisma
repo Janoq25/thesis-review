@@ -256,14 +256,17 @@ model ReviewAnnotation {
 }
 
 model PlagiarismReport {
-  id              String              @id @default(cuid())
-  advanceId       String              @unique
-  advance         Advance             @relation(fields: [advanceId], references: [id])
-  overallSimilarity Float
-  status          String              // "pending" | "complete" | "error"
-  scanId          String?             // ID de Copyleaks
-  alerts          PlagiarismAlert[]
-  createdAt       DateTime            @default(now())
+  id                  String              @id @default(cuid())
+  advanceId           String              @unique
+  advance             Advance             @relation(fields: [advanceId], references: [id])
+  overallSimilarity   Float
+  aiScore             Float?              // Porcentaje de texto generado por IA de Copyleaks
+  method              String              @default("embeddings") // "embeddings" | "copyleaks"
+  copyleaksReportKey  String?             // Clave S3 del reporte PDF resaltado
+  status              String              // "pending" | "complete" | "error"
+  scanId              String?             // ID de Copyleaks
+  alerts              PlagiarismAlert[]
+  createdAt           DateTime            @default(now())
 }
 
 model PlagiarismAlert {

@@ -1,10 +1,11 @@
 import { Worker, Job } from 'bullmq';
 import { PlagiarismService } from '../plagiarism/plagiarism.service';
-
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 
 const prisma = new PrismaService();
-const plagiarismService = new PlagiarismService(prisma);
+const storage = new StorageService();
+const plagiarismService = new PlagiarismService(prisma, storage);
 
 export const plagiarismWorker = new Worker(
   'plagiarism-analysis',
