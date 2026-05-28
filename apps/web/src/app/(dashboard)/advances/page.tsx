@@ -43,26 +43,27 @@ export default function AdvancesPage() {
     : advances;
 
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-medium text-gray-900 dark:text-gray-100">{t('advances.title')}</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-xl font-medium text-gray-900 dark:text-gray-100">{t('advances.title')}</h1>
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5">
             {t('advances.total', { count: total })}
           </p>
         </div>
         <a
           href="/advances/upload"
-          className="h-9 px-4 rounded-lg bg-[#185FA5] text-white text-sm font-medium
-                     hover:bg-[#0C447C] transition-colors flex items-center gap-1.5"
+          className="h-8 sm:h-9 px-3 sm:px-4 rounded-lg bg-[#185FA5] text-white text-xs sm:text-sm font-medium
+                     hover:bg-[#0C447C] transition-colors flex items-center gap-1 sm:gap-1.5 flex-shrink-0"
         >
-          <span className="text-base leading-none">+</span>
-          {t('dashboard.newAdvance')}
+          <span className="text-sm sm:text-base leading-none">+</span>
+          <span className="hidden sm:inline">{t('dashboard.newAdvance')}</span>
+          <span className="sm:hidden">Nuevo</span>
         </a>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
@@ -75,14 +76,14 @@ export default function AdvancesPage() {
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <Filter className="w-4 h-4 text-gray-400" />
+          <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
           <select
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
               setPage(1);
             }}
-            className="h-9 rounded-lg border border-gray-200 dark:border-gray-600 px-3 text-sm text-gray-700 dark:text-gray-200"
+            className="flex-1 sm:flex-none h-9 rounded-lg border border-gray-200 dark:border-gray-600 px-3 text-sm text-gray-700 dark:text-gray-200"
           >
             <option value="">{t('dashboard.allStatuses')}</option>
             {STATUSES.filter(Boolean).map((s) => (

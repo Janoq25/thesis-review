@@ -77,7 +77,7 @@ export function DocumentViewer({ advanceId }: DocumentViewerProps) {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-100 h-full">
+      <div className="flex-1 flex items-center justify-center bg-gray-100 h-full w-full">
         <div className="flex flex-col items-center gap-3 text-gray-500">
           <Loader2 className="w-8 h-8 animate-spin" />
           <p className="text-sm">Preparando visor seguro...</p>
@@ -88,7 +88,7 @@ export function DocumentViewer({ advanceId }: DocumentViewerProps) {
 
   if (!fileUrl) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50 h-full border-r border-gray-200">
+      <div className="flex-1 flex items-center justify-center bg-gray-50 h-full w-full border-r border-gray-200">
         <p className="text-sm text-gray-400">No se pudo cargar la vista previa</p>
       </div>
     );
@@ -101,7 +101,7 @@ export function DocumentViewer({ advanceId }: DocumentViewerProps) {
     const isReportLoading = viewMode === 'highlighted' && !highlightedUrl;
 
     return (
-      <div className="flex flex-col h-full bg-gray-50 border-r border-gray-200">
+      <div className="flex flex-col h-full w-full bg-gray-50 border-r border-gray-200">
         {showToggle && (
           <div className="flex items-center justify-between px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
             <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
@@ -131,21 +131,22 @@ export function DocumentViewer({ advanceId }: DocumentViewerProps) {
             </div>
           </div>
         )}
-        
-        {isReportLoading ? (
-          <div className="flex-1 flex items-center justify-center bg-gray-50">
-            <div className="flex flex-col items-center gap-3 text-gray-500">
-              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-              <p className="text-xs">Descargando reporte de marcas de Copyleaks...</p>
+        <div className="flex-1 flex flex-col min-h-0">
+          {isReportLoading ? (
+            <div className="flex-1 flex items-center justify-center bg-gray-50">
+              <div className="flex flex-col items-center gap-3 text-gray-500">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                <p className="text-xs">Descargando reporte de marcas de Copyleaks...</p>
+              </div>
             </div>
-          </div>
-        ) : (
-          <iframe
-            src={`${currentUrl}#toolbar=0`}
-            className="w-full h-full border-none"
-            title="Visor PDF"
-          />
-        )}
+          ) : (
+            <iframe
+              src={`${currentUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`}
+              className="w-full h-full border-none"
+              title="Visor PDF"
+            />
+          )}
+        </div>
       </div>
     );
   }

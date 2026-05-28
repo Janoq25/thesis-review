@@ -68,47 +68,49 @@ export default function BulkReviewPage() {
   };
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-5">
       <div>
-        <h1 className="text-xl font-medium text-gray-900 flex items-center gap-2">
-          <Layers className="w-5 h-5 text-[#185FA5]" />
+        <h1 className="text-base sm:text-xl font-medium text-gray-900 flex items-center gap-2">
+          <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-[#185FA5]" />
           Revisión por lotes
         </h1>
-        <p className="text-sm text-gray-500 mt-0.5">
+        <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
           Selecciona avances con análisis IA completado para aplicar acciones masivas.
         </p>
       </div>
 
       {/* Barra de acciones */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
-          <span className="text-sm font-medium text-blue-800">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+          <span className="text-sm font-medium text-blue-800 flex-shrink-0">
             {selectedIds.size} seleccionado{selectedIds.size > 1 ? 's' : ''}
           </span>
-          <select
-            value={batchAction}
-            onChange={(e) => setBatchAction(e.target.value as any)}
-            className="h-8 rounded-lg border border-blue-200 px-2 text-sm bg-white"
-          >
-            <option value="APPROVED">Aprobar</option>
-            <option value="OBSERVED">Observar</option>
-            <option value="REJECTED">Rechazar</option>
-          </select>
-          <input
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Comentario (opcional)..."
-            className="flex-1 h-8 rounded-lg border border-blue-200 px-3 text-sm bg-white placeholder-gray-400"
-          />
-          <button
-            onClick={() => applyMutation.mutate()}
-            disabled={applyMutation.isPending}
-            className="h-8 px-4 rounded-lg bg-[#185FA5] text-white text-sm font-medium
-                       hover:bg-[#0C447C] disabled:opacity-50 flex items-center gap-1.5"
-          >
-            {applyMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Aplicar
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto flex-1">
+            <select
+              value={batchAction}
+              onChange={(e) => setBatchAction(e.target.value as any)}
+              className="h-8 rounded-lg border border-blue-200 px-2 text-sm bg-white"
+            >
+              <option value="APPROVED">Aprobar</option>
+              <option value="OBSERVED">Observar</option>
+              <option value="REJECTED">Rechazar</option>
+            </select>
+            <input
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Comentario (opcional)..."
+              className="flex-1 h-8 rounded-lg border border-blue-200 px-3 text-sm bg-white placeholder-gray-400"
+            />
+            <button
+              onClick={() => applyMutation.mutate()}
+              disabled={applyMutation.isPending}
+              className="h-8 px-4 rounded-lg bg-[#185FA5] text-white text-sm font-medium
+                         hover:bg-[#0C447C] disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
+            >
+              {applyMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Aplicar
+            </button>
+          </div>
         </div>
       )}
 

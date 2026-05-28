@@ -100,15 +100,15 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="p-6 max-w-3xl">
-      <div className="mb-6">
-        <h1 className="text-xl font-medium text-gray-900">Cargar nuevo avance</h1>
-        <p className="text-sm text-gray-500 mt-1">
+    <div className="p-3 sm:p-6 max-w-3xl">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-base sm:text-xl font-medium text-gray-900">Cargar nuevo avance</h1>
+        <p className="text-xs sm:text-sm text-gray-500 mt-1">
           El análisis IA se inicia automáticamente al subir el documento.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
         {/* Formulario */}
         <div className="lg:col-span-3 space-y-5">
           {/* Drop zone */}

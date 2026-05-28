@@ -68,10 +68,10 @@ export function HumanReviewPanel({
       {/* Ajuste de nota */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-medium text-gray-700">Nota final</label>
+          <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Nota final</label>
           <div className="flex items-center gap-1.5">
-            <span className="text-xl font-medium text-gray-900">{finalGrade.toFixed(1)}</span>
-            <span className="text-sm text-gray-400">/ {MAX_GRADE}</span>
+            <span className="text-xl font-medium text-gray-900 dark:text-gray-100">{finalGrade.toFixed(1)}</span>
+            <span className="text-sm text-gray-400 dark:text-gray-500">/ {MAX_GRADE}</span>
           </div>
         </div>
         <input
@@ -95,7 +95,7 @@ export function HumanReviewPanel({
 
       {/* Rúbrica */}
       <div>
-        <p className="text-xs font-medium text-gray-700 mb-2.5">Rúbrica de evaluación</p>
+        <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2.5">Rúbrica de evaluación</p>
         <div className="space-y-2">
           {rubricItems.map((item: { key: string; label: string }) => (
             <label
@@ -111,7 +111,7 @@ export function HumanReviewPanel({
                 className="rounded border-gray-300 text-[#185FA5] accent-[#185FA5]"
                 disabled={isReadOnly}
               />
-              <span className="text-xs text-gray-700 group-hover:text-gray-900">
+              <span className="text-xs text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-gray-100">
                 {item.label}
               </span>
             </label>
@@ -124,14 +124,15 @@ export function HumanReviewPanel({
 
       {/* Comentario */}
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
           Comentario para el estudiante
         </label>
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="Escriba sus observaciones y recomendaciones de mejora..."
-          className="w-full h-28 text-xs p-2.5 border border-gray-200 rounded-lg resize-none
+          className="w-full h-28 text-xs p-2.5 border border-gray-200 dark:border-gray-600 rounded-lg resize-none
+                     bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
                      focus:outline-none focus:ring-1 focus:ring-[#185FA5] focus:border-[#185FA5]"
           disabled={isReadOnly}
         />

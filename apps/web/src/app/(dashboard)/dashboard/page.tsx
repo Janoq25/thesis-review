@@ -25,19 +25,20 @@ export default function DashboardPage() {
   });
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-medium text-gray-900 dark:text-gray-100">{t('dashboard.title')}</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('dashboard.period')}</p>
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-xl font-medium text-gray-900 dark:text-gray-100">{t('dashboard.title')}</h1>
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('dashboard.period')}</p>
         </div>
         <a
           href="/advances/upload"
-          className="h-9 px-4 rounded-lg bg-[#185FA5] text-white text-sm font-medium
-                     hover:bg-[#0C447C] transition-colors flex items-center gap-1.5"
+          className="h-8 sm:h-9 px-3 sm:px-4 rounded-lg bg-[#185FA5] text-white text-xs sm:text-sm font-medium
+                     hover:bg-[#0C447C] transition-colors flex items-center gap-1 sm:gap-1.5 flex-shrink-0"
         >
-          <span className="text-base leading-none">+</span>
-          {t('dashboard.newAdvance')}
+          <span className="text-sm sm:text-base leading-none">+</span>
+          <span className="hidden sm:inline">{t('dashboard.newAdvance')}</span>
+          <span className="sm:hidden">Nuevo</span>
         </a>
       </div>
 

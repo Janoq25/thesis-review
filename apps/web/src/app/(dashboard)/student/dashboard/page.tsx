@@ -41,37 +41,38 @@ export default function StudentDashboardPage() {
   ).length;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-[#185FA5] dark:text-blue-400" />
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-xl font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-[#185FA5] dark:text-blue-400 flex-shrink-0" />
             {t('student.title')}
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('student.subtitle')}</p>
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('student.subtitle')}</p>
         </div>
         <a
           href="/advances/upload"
-          className="h-9 px-4 rounded-lg bg-[#185FA5] text-white text-sm font-medium
-                     hover:bg-[#0C447C] transition-colors flex items-center gap-1.5"
+          className="h-8 sm:h-9 px-3 sm:px-4 rounded-lg bg-[#185FA5] text-white text-xs sm:text-sm font-medium
+                     hover:bg-[#0C447C] transition-colors flex items-center gap-1 sm:gap-1.5 flex-shrink-0"
         >
-          <Upload className="w-4 h-4" />
-          {t('student.uploadNew')}
+          <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <span className="hidden sm:inline">{t('student.uploadNew')}</span>
+          <span className="sm:hidden">Subir</span>
         </a>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 text-center">
-          <p className="text-2xl font-medium text-gray-900 dark:text-gray-100">{advances.length}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('student.totalSubmitted')}</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 sm:p-4 text-center">
+          <p className="text-xl sm:text-2xl font-medium text-gray-900 dark:text-gray-100">{advances.length}</p>
+          <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-1">{t('student.totalSubmitted')}</p>
         </div>
-        <div className="rounded-xl border border-green-100 dark:border-green-900 bg-green-50/30 dark:bg-green-950/30 p-4 text-center">
-          <p className="text-2xl font-medium text-green-700 dark:text-green-300">{approved}</p>
-          <p className="text-xs text-green-600 dark:text-green-400 mt-1">{t('student.approvedCount')}</p>
+        <div className="rounded-xl border border-green-100 dark:border-green-900 bg-green-50/30 dark:bg-green-950/30 p-3 sm:p-4 text-center">
+          <p className="text-xl sm:text-2xl font-medium text-green-700 dark:text-green-300">{approved}</p>
+          <p className="text-[10px] sm:text-xs text-green-600 dark:text-green-400 mt-1">{t('student.approvedCount')}</p>
         </div>
-        <div className="rounded-xl border border-amber-100 dark:border-amber-900 bg-amber-50/30 dark:bg-amber-950/30 p-4 text-center">
-          <p className="text-2xl font-medium text-amber-700 dark:text-amber-300">{observed + inProgress}</p>
-          <p className="text-xs text-green-600 dark:text-green-400 mt-1">{t('student.inProgressObserved')}</p>
+        <div className="rounded-xl border border-amber-100 dark:border-amber-900 bg-amber-50/30 dark:bg-amber-950/30 p-3 sm:p-4 text-center">
+          <p className="text-xl sm:text-2xl font-medium text-amber-700 dark:text-amber-300">{observed + inProgress}</p>
+          <p className="text-[10px] sm:text-xs text-green-600 dark:text-green-400 mt-1">{t('student.inProgressObserved')}</p>
         </div>
       </div>
 
@@ -113,7 +114,7 @@ export default function StudentDashboardPage() {
                 <button
                   key={adv.id}
                   onClick={() => router.push(`/advances/${adv.id}/review`)}
-                  className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                  className="w-full flex items-center gap-3 sm:gap-4 px-3 sm:px-5 py-3 sm:py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
                 >
                   <div
                     className={cn(
