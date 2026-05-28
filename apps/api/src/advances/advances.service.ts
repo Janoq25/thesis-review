@@ -95,7 +95,7 @@ export class AdvancesService {
       }),
       this.plagiarismQueue.add('analyze', {
         advanceId: advance.id,
-        method: 'embeddings',
+        method: 'copyleaks',
       }, { delay: 10_000 }), // esperar a que AI termine primero
       this.refQueue.add('check', { advanceId: advance.id }, { delay: 15_000 }),
     ]);
@@ -205,7 +205,7 @@ export class AdvancesService {
       }),
       this.plagiarismQueue.add('analyze', {
         advanceId: advance.id,
-        method: 'embeddings',
+        method: 'copyleaks',
       }, { delay: 15_000 }),
       this.refQueue.add('check', { advanceId: advance.id }, { delay: 20_000 }),
     ]);

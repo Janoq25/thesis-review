@@ -18,13 +18,10 @@ export class PlagiarismController {
   @Roles('ADVISOR', 'COORDINATOR', 'ADMIN')
   async analyze(
     @Param('advanceId') advanceId: string,
-    @Body() body: { method?: 'embeddings' | 'copyleaks' },
+    @Body() body: { method?: 'copyleaks' },
   ) {
-    const method = body.method ?? 'embeddings';
-    if (method === 'embeddings') {
-      this.plagiarismService.analyzeByEmbeddings(advanceId).catch(console.error);
-      return { message: 'Análisis de plagio por embeddings iniciado', method };
-    } else if (method === 'copyleaks') {
+    const method = body.method ?? 'copyleaks';
+    if (method === 'copyleaks') {
       this.plagiarismService.analyzeWithCopyleaks(advanceId).catch(console.error);
       return { message: 'Análisis de plagio e IA con Copyleaks iniciado', method };
     }

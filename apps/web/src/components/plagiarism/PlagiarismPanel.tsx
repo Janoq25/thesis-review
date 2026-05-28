@@ -26,7 +26,7 @@ export function PlagiarismPanel({ advanceId }: PlagiarismPanelProps) {
   });
 
   const analyzeMutation = useMutation({
-    mutationFn: (method: 'embeddings' | 'copyleaks') =>
+    mutationFn: (method: 'copyleaks') =>
       apiClient.post(`/plagiarism/analyze/${advanceId}`, { method }),
     onSuccess: (_, method) => {
       toast.success(`Análisis de plagio iniciado (${method})`);
@@ -40,24 +40,15 @@ export function PlagiarismPanel({ advanceId }: PlagiarismPanelProps) {
         <AlertTriangle className="h-8 w-8 text-gray-400 mx-auto mb-3" />
         <p className="text-sm font-medium text-gray-700 mb-1">Sin análisis de plagio</p>
         <p className="text-xs text-gray-500 mb-4">
-          Analice el documento para detectar similitudes con otros avances del programa.
+          Analice el documento con la API de Copyleaks para detectar similitudes y escritura por IA.
         </p>
-        <div className="flex gap-2 justify-center">
+        <div className="flex justify-center">
           <Button
             size="sm"
-            variant="outline"
-            onClick={() => analyzeMutation.mutate('embeddings')}
-            disabled={analyzeMutation.isPending}
-          >
-            Análisis por embeddings
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
             onClick={() => analyzeMutation.mutate('copyleaks')}
             disabled={analyzeMutation.isPending}
           >
-            Copyleaks API
+            Analizar con Copyleaks
           </Button>
         </div>
       </div>
@@ -132,12 +123,12 @@ export function PlagiarismPanel({ advanceId }: PlagiarismPanelProps) {
       </div>
 
       <div className="flex justify-between items-center text-xs text-gray-400 px-1">
-        <span>Método: {isCopyleaks ? 'Copyleaks API' : 'Embeddings Locales'}</span>
+        <span>Método: {report?.method === 'copyleaks' ? 'Copyleaks API' : 'Embeddings Locales (Legacy)'}</span>
         <Button
           size="sm"
           variant="ghost"
           className="h-6 text-[10px] text-gray-500 hover:text-gray-900"
-          onClick={() => analyzeMutation.mutate(isCopyleaks ? 'copyleaks' : 'embeddings')}
+          onClick={() => analyzeMutation.mutate('copyleaks')}
           disabled={analyzeMutation.isPending}
         >
           <RefreshCw className={`h-3 w-3 mr-1 ${analyzeMutation.isPending ? 'animate-spin' : ''}`} />
