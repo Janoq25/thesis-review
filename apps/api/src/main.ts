@@ -4,12 +4,22 @@ import { AppModule } from './app.module';
 import './jobs';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
+import * as express from 'express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   // Seguridad
   app.use(helmet());
+
+  // Raw body parsing for PDFs and binary streams (e.g., Copyleaks callbacks)
+  app.use(
+    express.raw({
+      type: ['application/pdf', 'application/octet-stream'],
+      limit: '50mb',
+    }),
+  );
+
   app.enableCors({
     origin: [process.env.FRONTEND_URL!, 'http://localhost:3000'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],

@@ -1,4 +1,10 @@
 import { Module } from '@nestjs/common';
-@Module({})
-export class NotificationsModule {}
+import { NotificationService } from './notifications.service';
+import { PushTokensController } from './push-tokens.controller';
 
+@Module({
+  controllers: [PushTokensController],
+  providers: [NotificationService],
+  exports: [NotificationService],
+})
+export class NotificationsModule {}

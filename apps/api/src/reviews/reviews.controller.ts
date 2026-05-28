@@ -13,7 +13,7 @@ export class ReviewsController {
   constructor(private reviewsService: ReviewsService) {}
 
   @Get('panel/:advanceId')
-  @Roles('ADVISOR', 'COORDINATOR', 'ADMIN')
+  @Roles('STUDENT', 'ADVISOR', 'COORDINATOR', 'ADMIN')
   getPanel(@Param('advanceId') advanceId: string) {
     return this.reviewsService.getReviewPanel(advanceId);
   }

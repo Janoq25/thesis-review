@@ -4,13 +4,15 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, XCircle, CheckCircle2 } from 'lucide-react';
 
 interface HumanReviewPanelProps {
   advanceId: string;
   existingReview?: any;
   rubric?: any;
   onSave?: (data: any) => void;
+  isSaving?: boolean;
+  disabled?: boolean;
 }
 
 const MAX_GRADE = Number(process.env.NEXT_PUBLIC_MAX_GRADE ?? 20);
@@ -20,6 +22,8 @@ export function HumanReviewPanel({
   existingReview,
   rubric,
   onSave,
+  isSaving = false,
+  disabled = false,
 }: HumanReviewPanelProps) {
   const qc = useQueryClient();
   const [finalGrade, setFinalGrade] = useState<number>(
@@ -29,7 +33,6 @@ export function HumanReviewPanel({
   const [rubricAnswers, setRubricAnswers] = useState<Record<string, boolean>>(
     existingReview?.rubricAnswers ?? {},
   );
-
   const saveMutation = useMutation({
     mutationFn: (body: any) => apiClient.post(`/reviews/${advanceId}`, body),
     onSuccess: () => {
@@ -38,6 +41,9 @@ export function HumanReviewPanel({
     },
     onError: (err: any) => toast.error(err.response?.data?.message ?? 'Error al guardar'),
   });
+
+  const isPending = isSaving || saveMutation.isPending;
+  const isReadOnly = disabled || ['APPROVED', 'REJECTED'].includes(existingReview?.status);
 
   const rubricItems = rubric?.dimensions?.length > 0
     ? rubric.dimensions.map((d: any) => ({ key: d.name, label: d.name }))
@@ -62,10 +68,10 @@ export function HumanReviewPanel({
       {/* Ajuste de nota */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-medium text-gray-700">Nota final</label>
+          <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Nota final</label>
           <div className="flex items-center gap-1.5">
-            <span className="text-xl font-medium text-gray-900">{finalGrade.toFixed(1)}</span>
-            <span className="text-sm text-gray-400">/ {MAX_GRADE}</span>
+            <span className="text-xl font-medium text-gray-900 dark:text-gray-100">{finalGrade.toFixed(1)}</span>
+            <span className="text-sm text-gray-400 dark:text-gray-500">/ {MAX_GRADE}</span>
           </div>
         </div>
         <input
@@ -76,6 +82,7 @@ export function HumanReviewPanel({
           value={finalGrade}
           onChange={(e) => setFinalGrade(Number(e.target.value))}
           className="w-full accent-[#185FA5]"
+          disabled={isReadOnly}
         />
         <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
           <span>0</span>
@@ -88,7 +95,7 @@ export function HumanReviewPanel({
 
       {/* Rúbrica */}
       <div>
-        <p className="text-xs font-medium text-gray-700 mb-2.5">Rúbrica de evaluación</p>
+        <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2.5">Rúbrica de evaluación</p>
         <div className="space-y-2">
           {rubricItems.map((item: { key: string; label: string }) => (
             <label
@@ -102,8 +109,9 @@ export function HumanReviewPanel({
                   setRubricAnswers((prev) => ({ ...prev, [item.key]: e.target.checked }))
                 }
                 className="rounded border-gray-300 text-[#185FA5] accent-[#185FA5]"
+                disabled={isReadOnly}
               />
-              <span className="text-xs text-gray-700 group-hover:text-gray-900">
+              <span className="text-xs text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-gray-100">
                 {item.label}
               </span>
             </label>
@@ -116,15 +124,17 @@ export function HumanReviewPanel({
 
       {/* Comentario */}
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
           Comentario para el estudiante
         </label>
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="Escriba sus observaciones y recomendaciones de mejora..."
-          className="w-full h-28 text-xs p-2.5 border border-gray-200 rounded-lg resize-none
+          className="w-full h-28 text-xs p-2.5 border border-gray-200 dark:border-gray-600 rounded-lg resize-none
+                     bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
                      focus:outline-none focus:ring-1 focus:ring-[#185FA5] focus:border-[#185FA5]"
+          disabled={isReadOnly}
         />
         <p className="text-[10px] text-gray-400 text-right mt-0.5">
           {comment.length} caracteres
@@ -132,25 +142,45 @@ export function HumanReviewPanel({
       </div>
 
       {/* Botones */}
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          onClick={() => handleSave('OBSERVED')}
-          disabled={saveMutation.isPending}
-          className="h-9 rounded-lg border border-amber-200 text-amber-700 text-xs
-                     font-medium hover:bg-amber-50 transition-colors"
-        >
-          Guardar como observado
-        </button>
-        <button
-          onClick={() => handleSave('APPROVED')}
-          disabled={saveMutation.isPending}
-          className="h-9 rounded-lg bg-green-600 hover:bg-green-700 text-white
-                     text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
-        >
-          {saveMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-          Aprobar avance
-        </button>
-      </div>
+      {isReadOnly ? (
+        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg text-center text-xs font-medium text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-gray-700">
+          La revisión de este avance ha finalizado.
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            onClick={() => handleSave('OBSERVED')}
+            disabled={isPending}
+            className="h-9 px-2 rounded-lg border border-amber-200 text-amber-700 text-xs
+                       font-medium hover:bg-amber-50 transition-colors flex items-center justify-center gap-1"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            Observar
+          </button>
+          <button
+            onClick={() => handleSave('REJECTED')}
+            disabled={isPending}
+            className="h-9 px-2 rounded-lg border border-red-200 text-red-700 dark:text-red-400 text-xs
+                       font-medium hover:bg-red-50 dark:hover:bg-red-950 transition-colors flex items-center justify-center gap-1"
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            Rechazar
+          </button>
+          <button
+            onClick={() => handleSave('APPROVED')}
+            disabled={isPending}
+            className="h-9 px-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs
+                       font-medium transition-colors flex items-center justify-center gap-1"
+          >
+            {isPending ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            )}
+            Aprobar
+          </button>
+        </div>
+      )}
 
       {/* Historial */}
       {existingReview && (

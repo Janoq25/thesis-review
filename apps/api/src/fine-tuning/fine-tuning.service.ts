@@ -1,16 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { OpenAI } from 'openai';
+import { AzureOpenAI } from 'openai';
+import { createAzureOpenAIClient } from '../common/azure-openai.config';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 
 @Injectable()
 export class FineTuningService {
-  private openai: OpenAI;
+  private openai: AzureOpenAI;
 
   constructor(private prisma: PrismaService) {
-    this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    this.openai = createAzureOpenAIClient();
   }
 
   // Llamado cuando un asesor acepta, edita o descarta un hallazgo

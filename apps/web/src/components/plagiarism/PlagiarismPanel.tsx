@@ -4,7 +4,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PlagiarismPanelProps {
@@ -22,11 +22,11 @@ export function PlagiarismPanel({ advanceId }: PlagiarismPanelProps) {
     queryKey: ['plagiarism-report', advanceId],
     queryFn: () =>
       apiClient.get(`/plagiarism/report/${advanceId}`).then((r) => r.data),
-    refetchInterval: (data) => (data?.status === 'processing' ? 3000 : false),
+    refetchInterval: ({ state }) => (state.data?.status === 'processing' ? 3000 : false),
   });
 
   const analyzeMutation = useMutation({
-    mutationFn: (method: 'embeddings' | 'copyleaks') =>
+    mutationFn: (method: 'copyleaks') =>
       apiClient.post(`/plagiarism/analyze/${advanceId}`, { method }),
     onSuccess: (_, method) => {
       toast.success(`Análisis de plagio iniciado (${method})`);
@@ -40,24 +40,15 @@ export function PlagiarismPanel({ advanceId }: PlagiarismPanelProps) {
         <AlertTriangle className="h-8 w-8 text-gray-400 mx-auto mb-3" />
         <p className="text-sm font-medium text-gray-700 mb-1">Sin análisis de plagio</p>
         <p className="text-xs text-gray-500 mb-4">
-          Analice el documento para detectar similitudes con otros avances del programa.
+          Analice el documento con la API de Copyleaks para detectar similitudes y escritura por IA.
         </p>
-        <div className="flex gap-2 justify-center">
+        <div className="flex justify-center">
           <Button
             size="sm"
-            variant="outline"
-            onClick={() => analyzeMutation.mutate('embeddings')}
-            disabled={analyzeMutation.isPending}
-          >
-            Análisis por embeddings
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
             onClick={() => analyzeMutation.mutate('copyleaks')}
             disabled={analyzeMutation.isPending}
           >
-            Copyleaks API
+            Analizar con Copyleaks
           </Button>
         </div>
       </div>
@@ -74,42 +65,75 @@ export function PlagiarismPanel({ advanceId }: PlagiarismPanelProps) {
   }
 
   const alerts = report?.alerts ?? [];
-  const criticalAlerts = alerts.filter((a: any) => a.severity === 'critical');
-  const score = report?.overallScore ?? 0;
+  const score = report?.overallSimilarity ?? 0;
+  const isCopyleaks = report?.method === 'copyleaks';
+  const aiScore = report?.aiScore ?? 0;
 
   return (
     <div className="space-y-4">
       {/* Resumen */}
-      <div
-        className={`rounded-xl border p-4 flex items-center justify-between ${
-          score >= 85
-            ? 'border-red-200 bg-red-50'
-            : score >= 70
-            ? 'border-amber-200 bg-amber-50'
-            : 'border-green-200 bg-green-50'
-        }`}
-      >
-        <div>
-          <p className="text-sm font-medium text-gray-900">
-            Similitud máxima detectada:{' '}
-            <span
-              className={`font-semibold ${
-                score >= 85 ? 'text-red-700' : score >= 70 ? 'text-amber-700' : 'text-green-700'
-              }`}
-            >
+      <div className={isCopyleaks ? "grid grid-cols-2 gap-3" : "w-full"}>
+        {/* Tarjeta de Plagio */}
+        <div
+          className={`rounded-xl border p-4 flex flex-col justify-between ${
+            score >= 15
+              ? 'border-red-200 bg-red-50 dark:bg-red-950/20'
+              : score >= 10
+              ? 'border-amber-200 bg-amber-50 dark:bg-amber-950/20'
+              : 'border-green-200 bg-green-50 dark:bg-green-950/20'
+          }`}
+        >
+          <div>
+            <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Similitud / Plagio</p>
+            <p className={`text-2xl font-bold mt-1 ${
+              score >= 15 ? 'text-red-700 dark:text-red-400' : score >= 10 ? 'text-amber-700 dark:text-amber-400' : 'text-green-700 dark:text-green-400'
+            }`}>
               {score.toFixed(1)}%
-            </span>
-          </p>
-          <p className="text-xs text-gray-600 mt-0.5">
-            {alerts.length} coincidencias · {criticalAlerts.length} críticas
+            </p>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            {alerts.length} coincidencias detectadas
           </p>
         </div>
-        {score < 70 && (
-          <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />
+
+        {/* Tarjeta de Escritura por IA */}
+        {isCopyleaks && (
+          <div
+            className={`rounded-xl border p-4 flex flex-col justify-between ${
+              aiScore >= 50
+                ? 'border-red-200 bg-red-50 dark:bg-red-950/20'
+                : aiScore >= 20
+                ? 'border-amber-200 bg-amber-50 dark:bg-amber-950/20'
+                : 'border-green-200 bg-green-50 dark:bg-green-950/20'
+            }`}
+          >
+            <div>
+              <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Escritura por IA</p>
+              <p className={`text-2xl font-bold mt-1 ${
+                aiScore >= 50 ? 'text-red-700 dark:text-red-400' : aiScore >= 20 ? 'text-amber-700 dark:text-amber-400' : 'text-green-700 dark:text-green-400'
+              }`}>
+                {aiScore.toFixed(1)}%
+              </p>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {aiScore >= 50 ? 'Sospecha crítica' : aiScore >= 20 ? 'Sospecha moderada' : 'Texto original humano'}
+            </p>
+          </div>
         )}
-        {score >= 85 && (
-          <AlertTriangle className="h-6 w-6 text-red-600 flex-shrink-0" />
-        )}
+      </div>
+
+      <div className="flex justify-between items-center text-xs text-gray-400 px-1">
+        <span>Método: {report?.method === 'copyleaks' ? 'Copyleaks API' : 'Embeddings Locales (Legacy)'}</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 text-[10px] text-gray-500 hover:text-gray-900"
+          onClick={() => analyzeMutation.mutate('copyleaks')}
+          disabled={analyzeMutation.isPending}
+        >
+          <RefreshCw className={`h-3 w-3 mr-1 ${analyzeMutation.isPending ? 'animate-spin' : ''}`} />
+          Volver a analizar
+        </Button>
       </div>
 
       {/* Lista de alertas */}
@@ -122,13 +146,13 @@ export function PlagiarismPanel({ advanceId }: PlagiarismPanelProps) {
             <div className="flex items-start justify-between gap-3 mb-2">
               <div>
                 <p className="text-xs font-medium text-gray-900">
-                  Sección: {alert.sectionName}
+                  {alert.sectionName ? `Sección: ${alert.sectionName}` : 'Reporte de Similitud'}
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Coincide con:{' '}
-                  <span className="font-medium text-gray-700">
-                    {alert.targetAdvance?.student?.name ?? 'Documento externo'} —{' '}
-                    {alert.targetAdvance?.title ?? ''}
+                  <span className="font-medium text-gray-700 max-w-[250px] truncate block md:inline-block">
+                    {alert.targetAdvance?.student?.name ?? (alert.sourceUrl || 'Fuente externa')}
+                    {alert.targetAdvance?.title ? ` — ${alert.targetAdvance.title}` : ''}
                   </span>
                 </p>
               </div>

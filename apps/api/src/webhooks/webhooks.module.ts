@@ -1,4 +1,9 @@
 import { Module } from '@nestjs/common';
-@Module({})
-export class WebhooksModule {}
+import { PlagiarismModule } from '../plagiarism/plagiarism.module';
+import { WebhooksController } from './webhooks.controller';
 
+@Module({
+  imports: [PlagiarismModule],
+  controllers: [WebhooksController],
+})
+export class WebhooksModule {}

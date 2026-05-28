@@ -1,1 +1,2 @@
-// TODO: Implementar ai-engine\src\index.ts en Packages
+export * from './pipeline/text-extractor';
+export * from './pipeline/analyzer';
