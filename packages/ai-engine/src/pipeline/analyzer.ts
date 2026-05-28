@@ -62,7 +62,7 @@ export async function analyzeDocument(
       process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ??
       'gpt-4o',
     azureOpenAIApiVersion: process.env.AZURE_OPENAI_API_VERSION ?? '2024-08-01-preview',
-    temperature: 0.4, 
+    temperature: 0.1, 
   });
 
   const structuredLlm = llm.withStructuredOutput(analysisSchema, {
@@ -83,8 +83,17 @@ INSTRUCCIONES DE REVISIÓN:
 2. Revisión obligatoria de Referencias (APA 7, actualidad 80%, etc.).
 3. Revisión de forma (Fuente Arial Narrow 12, interlineado 1.5).
 
+CRITERIOS DE PUNTUACIÓN (Escala de 0 a 100):
+Evalúa cada dimensión de forma independiente y crítica:
+- structureScore (Estructura - 30%): Evalúa si cuenta con las secciones requeridas y estructura lógica.
+- contentScore (Contenido - 40%): Evalúa el rigor científico, la justificación del problema, objetivos claros y solidez metodológica.
+- formScore (Forma - 20%): Cumplimiento de normas de estilo de redacción, citación APA y formato visual.
+- originalityScore (Originalidad - 10%): Innovación, aporte del tema al estado del arte y contribución propia.
+- overallScore (Similitud/Puntaje Global): Promedio ponderado de los puntajes anteriores según la importancia que le asigne la rúbrica patrón.
+- gradeConverted (Nota Convertida): Nota final convertida al sistema de calificación local (escala de 0 a 20).
+
 CALIFICACIÓN:
-Sé riguroso y crítico. Evita notas promedio.
+Sé riguroso y crítico. Evita notas promedio y evalúa de forma diferenciada cada criterio según el texto provisto. No dupliques la misma calificación para todos los ámbitos a menos que realmente tengan el mismo nivel de desempeño.
 
 RÚBRICA PATRÓN:
 {rubric}
