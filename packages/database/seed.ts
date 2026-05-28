@@ -8,6 +8,30 @@ async function main() {
 
   // 1. Programas académicos
   const [progIngenieria, progEducacion, progDerecho] = await Promise.all([
+    prisma.user.upsert({
+      where: { email: "aquirozr@unitru.edu.pe" },
+      update: { role: "STUDENT", advisorId: "cmpp9fqh60008s6hordm4hw85" },
+      create: {
+        email: "aquirozr@unitru.edu.pe",
+        passwordHash: await bcrypt.hash("ThesisReview2025!", 12),
+        name: "A. Quiroz R.",
+        role: "STUDENT",
+        programId: "prog-ingenieria",
+        advisorId: "cmpp9fqh60008s6hordm4hw85"
+      }
+    }),
+    prisma.user.upsert({
+      where: { email: "lzavaletacar@unitru.edu.pe" },
+      update: { role: "STUDENT", advisorId: "cmpp9fqh60008s6hordm4hw85" },
+      create: {
+        email: "lzavaletacar@unitru.edu.pe",
+        passwordHash: await bcrypt.hash("ThesisReview2025!", 12),
+        name: "L. Zavaleta C.",
+        role: "STUDENT",
+        programId: "prog-ingenieria",
+        advisorId: "cmpp9fqh60008s6hordm4hw85"
+      }
+    }),
     prisma.program.upsert({
       where: { id: 'prog-ingenieria' },
       update: {},
