@@ -9,7 +9,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U thesis -d thesis_review" ]
       interval: 5s
@@ -48,6 +48,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: ${MINIO_BUCKET}
       AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY}
+      FRONTEND_URL: ${FRONTEND_URL}
       OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY}
       AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT}
       AZURE_OPENAI_API_INSTANCE_NAME: ${AZURE_OPENAI_API_INSTANCE_NAME}
@@ -80,20 +81,20 @@ services:
       redis:
         condition: service_started
     ports:
-      - "3001:3001"
+      - "3003:3001"
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:3001
+        NEXT_PUBLIC_API_URL: https://api.ts-review.lenzhit.xyz
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_API_URL: https://api.ts-review.lenzhit.xyz
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_URL: https://ts-review.lenzhit.xyz
     ports:
-      - "3000:3000"
+      - "3002:3000"
     depends_on:
       - api
 
