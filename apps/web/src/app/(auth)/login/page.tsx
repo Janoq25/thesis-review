@@ -123,7 +123,7 @@ export default function LoginPage() {
               {t('auth.coordinator')}: coordinadora@universidad.edu.pe
             </div>
             <div>{t('auth.advisor')}: jperez@universidad.edu.pe</div>
-            <div>{t('auth.student')}: ktorres@estudiante.edu.pe</div>
+            <div>{t('auth.student')}: ktorres@estudiante.edu.pe, aquirozr@unitru.edu.pe, lzavaletacar@unitru.edu.pe</div>
             <div>Password: ThesisReview2025!</div>
           </div>
         </div>

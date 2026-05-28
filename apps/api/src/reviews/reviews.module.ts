@@ -9,6 +9,7 @@ import { BulkReviewController } from './bulk-review.controller';
   imports: [
     NotificationsModule,
     BullModule.registerQueue({ name: 'ai-analysis' }),
+    BullModule.registerQueue({ name: 'email' }),
   ],
   controllers: [ReviewsController, BulkReviewController],
   providers: [ReviewsService],

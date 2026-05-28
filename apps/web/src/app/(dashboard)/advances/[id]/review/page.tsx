@@ -11,7 +11,7 @@ import { AIEvaluationPanel } from '@/components/review/AIEvaluationPanel';
 import { HumanReviewPanel } from '@/components/review/HumanReviewPanel';
 import { PlagiarismPanel } from '@/components/plagiarism/PlagiarismPanel';
 import { ReferencesPanel } from '@/components/references/ReferencesPanel';
-import { CheckCircle2, XCircle, Eye, Loader2, FileDown } from 'lucide-react';
+import { Loader2, FileDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n/context';
 import { useStatusConfig } from '@/lib/i18n/use-status-config';
@@ -129,39 +129,7 @@ export default function ReviewPage() {
             {t('review.downloadReport')}
           </button>
 
-          {canReview && (
-            <>
-              <button
-                onClick={() => reviewMutation.mutate({ status: 'OBSERVED' })}
-                disabled={reviewMutation.isPending}
-                className="h-8 px-3 rounded-lg border border-amber-200 text-amber-700 text-xs
-                           hover:bg-amber-50 flex items-center gap-1.5"
-              >
-                <Eye className="w-3.5 h-3.5" />
-                {t('review.observe')}
-              </button>
-              <button
-                onClick={() => reviewMutation.mutate({ status: 'REJECTED' })}
-                disabled={reviewMutation.isPending}
-                className="h-8 px-3 rounded-lg border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs
-                           hover:bg-red-50 dark:hover:bg-red-950 flex items-center gap-1.5"
-              >
-                <XCircle className="w-3.5 h-3.5" />
-                {t('review.reject')}
-              </button>
-              <button
-                onClick={() => reviewMutation.mutate({ status: 'APPROVED' })}
-                disabled={reviewMutation.isPending}
-                className="h-8 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white
-                           text-xs flex items-center gap-1.5"
-              >
-                {reviewMutation.isPending
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <CheckCircle2 className="w-3.5 h-3.5" />}
-                {t('review.approve')}
-              </button>
-            </>
-          )}
+
         </div>
       </div>
 
@@ -207,6 +175,8 @@ export default function ReviewPage() {
                   existingReview={advance?.review}
                   rubric={advance?.template?.rubric}
                   onSave={(data) => reviewMutation.mutate(data)}
+                  isSaving={reviewMutation.isPending}
+                  disabled={!canReview}
                 />
               </TabsContent>
               <TabsContent value="plagiarism" className="p-4 m-0">
