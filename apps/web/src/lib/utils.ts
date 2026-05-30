@@ -11,6 +11,30 @@ export function formatDate(date: string | Date, locale = 'es-PE'): string {
   });
 }
 
+export function formatDayMonth(date: string | Date): string {
+  const d = new Date(date);
+  return d.toLocaleDateString('es-PE', { day: 'numeric', month: 'long' });
+}
+
+export function formatDayMonthYear(date: string | Date): string {
+  const d = new Date(date);
+  return d.toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+export function formatDateTime(date: string | Date): string {
+  const d = new Date(date);
+  const dateStr = d.toLocaleDateString('es-PE', { day: 'numeric', month: 'long' });
+  const timeStr = d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return `${dateStr} a las ${timeStr}`;
+}
+
+export function formatShortDateTime(date: string | Date): string {
+  const d = new Date(date);
+  const dateStr = d.toLocaleDateString('es-PE', { day: 'numeric', month: 'short' });
+  const timeStr = d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return `${dateStr}, ${timeStr}`;
+}
+
 export function formatRelative(date: string | Date): string {
   const diff = Date.now() - new Date(date).getTime();
   const mins = Math.floor(diff / 60_000);

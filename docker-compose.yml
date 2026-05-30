@@ -88,11 +88,11 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: https://api.ts-review.lenzhit.xyz
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3003}
     environment:
-      NEXT_PUBLIC_API_URL: https://api.ts-review.lenzhit.xyz
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3003}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-      NEXTAUTH_URL: https://ts-review.lenzhit.xyz
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3002}
     ports:
       - "3002:3000"
     depends_on:

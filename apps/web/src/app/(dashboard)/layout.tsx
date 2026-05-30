@@ -22,8 +22,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const NAV_ITEMS = useMemo(
     () => [
       { href: '/dashboard', labelKey: 'nav.dashboard' as const, icon: LayoutDashboard, roles: ['ADVISOR', 'COORDINATOR', 'ADMIN'] },
-      { href: '/advances/upload', labelKey: 'nav.uploadAdvance' as const, icon: Upload, roles: ['STUDENT', 'ADVISOR', 'COORDINATOR', 'ADMIN'] },
-      { href: '/advances', labelKey: 'nav.advances' as const, icon: FileSearch, roles: ['ADVISOR', 'COORDINATOR', 'ADMIN'] },
+      { href: '/advisor/assignments', labelKey: 'nav.assignments' as const, icon: Layers, roles: ['ADVISOR'] },
+      { href: '/advances/upload', labelKey: 'nav.uploadAdvance' as const, icon: Upload, roles: ['STUDENT', 'COORDINATOR', 'ADMIN'] },
+      { href: '/advances', labelKey: 'nav.advances' as const, icon: FileSearch, roles: ['COORDINATOR', 'ADMIN'] },
       { href: '/student/dashboard', labelKey: 'nav.myAdvances' as const, icon: BookOpen, roles: ['STUDENT'] },
       { href: '/bulk-review', labelKey: 'nav.bulkReview' as const, icon: Layers, roles: ['COORDINATOR', 'ADMIN'] },
       { href: '/templates', labelKey: 'nav.templates' as const, icon: BookOpen, roles: ['COORDINATOR', 'ADMIN'] },

@@ -31,12 +31,14 @@ export class AdvancesService {
 
   async upload(params: {
     studentId: string;
-    programId: string;
-    templateId: string;
-    advanceType: string;
+    programId?: string;
+    templateId?: string;
+    advanceType?: string;
+    assignmentId?: string;
+    isSimulation?: boolean;
     file: Express.Multer.File;
   }) {
-    const { studentId, programId, templateId, advanceType, file } = params;
+    let { studentId, programId, templateId, advanceType, assignmentId, isSimulation = false, file } = params;
 
     // Validaciones
     if (!ALLOWED_TYPES.includes(file.mimetype)) {
@@ -44,6 +46,48 @@ export class AdvancesService {
     }
     if (file.size > MAX_SIZE_BYTES) {
       throw new BadRequestException('El archivo supera el límite de 50 MB');
+    }
+
+    // RESOLUCIÓN DE CONFIGURACIÓN POR TAREA
+    if (assignmentId) {
+      const assignment = await this.prisma.assignment.findUnique({
+        where: { id: assignmentId },
+        include: { template: true },
+      });
+      if (!assignment) throw new NotFoundException('Tarea no encontrada');
+
+      // Validar si la tarea ya inició
+      if (assignment.startDate && new Date() < new Date(assignment.startDate)) {
+        throw new BadRequestException('La tarea aún no ha iniciado para la recepción de entregas');
+      }
+
+      // Validar si la fecha límite ya pasó (solo para entregas oficiales)
+      if (!isSimulation && assignment.deadlineDate && new Date() > new Date(assignment.deadlineDate)) {
+        throw new BadRequestException('La fecha límite para presentar este avance ha vencido');
+      }
+
+      // Validar envío único si es entrega oficial
+      if (!isSimulation) {
+        const existing = await this.prisma.advance.findFirst({
+          where: {
+            studentId,
+            assignmentId,
+            isSimulation: false,
+          },
+        });
+        if (existing) {
+          throw new BadRequestException('Ya has subido un avance para esta tarea. Solo se permite un envío oficial.');
+        }
+      }
+
+      // Sobrescribir campos con la configuración de la tarea
+      templateId = assignment.templateId || undefined;
+      advanceType = assignment.advanceType;
+      programId = assignment.template?.programId || undefined;
+    }
+
+    if (!templateId || !programId || !advanceType) {
+      throw new BadRequestException('Falta la configuración de programa, plantilla o tipo de avance para esta entrega.');
     }
 
     // Verificar que el programa y template existen
@@ -54,7 +98,7 @@ export class AdvancesService {
 
     // Calcular número de versión
     const lastVersion = await this.prisma.advance.findFirst({
-      where: { studentId, programId, advanceType },
+      where: { studentId, programId, assignmentId },
       orderBy: { version: 'desc' },
       select: { version: true },
     });
@@ -62,17 +106,20 @@ export class AdvancesService {
 
     // Subir archivo a MinIO/S3
     const fileType = file.mimetype.includes('pdf') ? 'pdf' : 'docx';
-    const fileKey = `advances/${programId}/${studentId}/${advanceType}/v${version}.${fileType}`;
+    const folderName = assignmentId || advanceType;
+    const fileKey = `advances/${programId}/${studentId}/${folderName}/v${version}.${fileType}`;
     await this.storage.upload(fileKey, file.buffer, file.mimetype);
 
     // Crear registro en BD
-    const fileName = path.parse(file.originalname).name;
+    const fileName = file.originalname;
     const advance = await this.prisma.advance.create({
       data: {
         studentId,
         programId,
         templateId,
         advanceType,
+        assignmentId,
+        isSimulation,
         version,
         fileKey,
         fileType,
@@ -109,12 +156,14 @@ export class AdvancesService {
   async uploadBulkFile(params: {
     uploader: any;
     studentId?: string;
-    programId: string;
-    templateId: string;
-    advanceType: string;
+    programId?: string;
+    templateId?: string;
+    advanceType?: string;
+    assignmentId?: string;
+    isSimulation?: boolean;
     file: Express.Multer.File;
   }) {
-    const { uploader, programId, templateId, advanceType, file } = params;
+    let { uploader, programId, templateId, advanceType, assignmentId, isSimulation = false, file } = params;
     let studentId = params.studentId;
 
     // Validaciones de archivo
@@ -156,6 +205,48 @@ export class AdvancesService {
       studentId = uploader.id;
     }
 
+    // RESOLUCIÓN DE CONFIGURACIÓN POR TAREA
+    if (assignmentId) {
+      const assignment = await this.prisma.assignment.findUnique({
+        where: { id: assignmentId },
+        include: { template: true },
+      });
+      if (!assignment) throw new NotFoundException('Tarea no encontrada');
+
+      // Validar si la tarea ya inició
+      if (assignment.startDate && new Date() < new Date(assignment.startDate)) {
+        throw new BadRequestException('La tarea aún no ha iniciado para la recepción de entregas');
+      }
+
+      // Validar si la fecha límite ya pasó (solo para entregas oficiales)
+      if (!isSimulation && assignment.deadlineDate && new Date() > new Date(assignment.deadlineDate)) {
+        throw new BadRequestException('La fecha límite para presentar este avance ha vencido');
+      }
+
+      // Validar envío único si es entrega oficial
+      if (!isSimulation && studentId) {
+        const existing = await this.prisma.advance.findFirst({
+          where: {
+            studentId,
+            assignmentId,
+            isSimulation: false,
+          },
+        });
+        if (existing) {
+          throw new BadRequestException(`El estudiante ya tiene un avance definitivo para esta tarea.`);
+        }
+      }
+
+      // Sobrescribir campos con la configuración de la tarea
+      templateId = assignment.templateId || undefined;
+      advanceType = assignment.advanceType;
+      programId = assignment.template?.programId || undefined;
+    }
+
+    if (!templateId || !programId || !advanceType) {
+      throw new BadRequestException('Falta la configuración de programa, plantilla o tipo de avance para esta entrega.');
+    }
+
     // Verificar que el programa y template existen
     const template = await this.prisma.thesisTemplate.findFirst({
       where: { id: templateId, programId, isActive: true },
@@ -164,7 +255,7 @@ export class AdvancesService {
 
     // Calcular versión
     const lastVersion = await this.prisma.advance.findFirst({
-      where: { studentId, programId, advanceType },
+      where: { studentId, programId, assignmentId },
       orderBy: { version: 'desc' },
       select: { version: true },
     });
@@ -172,17 +263,20 @@ export class AdvancesService {
 
     // Subir a S3
     const fileType = file.mimetype.includes('pdf') ? 'pdf' : 'docx';
-    const fileKey = `advances/${programId}/${studentId}/${advanceType}/v${version}.${fileType}`;
+    const folderName = assignmentId || advanceType;
+    const fileKey = `advances/${programId}/${studentId}/${folderName}/v${version}.${fileType}`;
     await this.storage.upload(fileKey, file.buffer, file.mimetype);
 
     // Crear registro
-    const fileName = path.parse(file.originalname).name;
+    const fileName = file.originalname;
     const advance = await this.prisma.advance.create({
       data: {
         studentId: studentId!,
         programId,
         templateId,
         advanceType,
+        assignmentId,
+        isSimulation,
         version,
         fileKey,
         fileType,
@@ -281,6 +375,9 @@ export class AdvancesService {
         plagiarismReport: {
           select: { overallSimilarity: true, status: true },
         },
+        review: {
+          select: { finalGrade: true, status: true },
+        },
         program: { select: { name: true } },
       },
       orderBy: [{ advanceType: 'asc' }, { version: 'desc' }],
@@ -298,6 +395,7 @@ export class AdvancesService {
 
     const where: any = {
       student: { advisorId },
+      isSimulation: false,
       ...(status && { status }),
       ...(programId && { programId }),
     };
@@ -391,6 +489,7 @@ export class AdvancesService {
     const { status, programId, page = 1, pageSize = 20 } = filters;
     const skip = (page - 1) * pageSize;
     const where: any = {
+      isSimulation: false,
       ...(status && { status }),
       ...(programId && { programId }),
     };

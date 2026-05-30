@@ -25,9 +25,11 @@ export class AdvancesController {
   upload(
     @UploadedFile() file: Express.Multer.File,
     @Body() body: {
-      programId: string;
-      templateId: string;
-      advanceType: string;
+      programId?: string;
+      templateId?: string;
+      advanceType?: string;
+      assignmentId?: string;
+      isSimulation?: string | boolean;
     },
     @Request() req: any,
   ) {
@@ -35,11 +37,15 @@ export class AdvancesController {
       ? req.user.id
       : (body as any).studentId ?? req.user.id;
 
+    const isSimulation = body.isSimulation === 'true' || body.isSimulation === true;
+
     return this.advancesService.upload({
       studentId,
       programId: body.programId,
       templateId: body.templateId,
       advanceType: body.advanceType,
+      assignmentId: body.assignmentId,
+      isSimulation,
       file,
     });
   }
@@ -50,14 +56,17 @@ export class AdvancesController {
   async uploadBulk(
     @UploadedFiles() files: Array<Express.Multer.File>,
     @Body() body: {
-      programId: string;
-      templateId: string;
-      advanceType: string;
+      programId?: string;
+      templateId?: string;
+      advanceType?: string;
+      assignmentId?: string;
       studentId?: string;
+      isSimulation?: string | boolean;
     },
     @Request() req: any,
   ) {
     const results: any[] = [];
+    const isSimulation = body.isSimulation === 'true' || body.isSimulation === true;
     for (const file of files) {
       try {
         const studentId = req.user.role === 'STUDENT'
@@ -69,7 +78,9 @@ export class AdvancesController {
           programId: body.programId,
           templateId: body.templateId,
           advanceType: body.advanceType,
+          assignmentId: body.assignmentId,
           studentId,
+          isSimulation,
           file,
         });
         results.push({ filename: file.originalname, success: true, advanceId: advance.id });

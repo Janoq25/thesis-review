@@ -15,11 +15,20 @@ export class PlagiarismController {
   constructor(private plagiarismService: PlagiarismService) {}
 
   @Post('analyze/:advanceId')
-  @Roles('ADVISOR', 'COORDINATOR', 'ADMIN')
+  @Roles('STUDENT', 'ADVISOR', 'COORDINATOR', 'ADMIN')
   async analyze(
     @Param('advanceId') advanceId: string,
     @Body() body: { method?: 'copyleaks' },
+    @Request() req: any,
   ) {
+    const advance = await this.plagiarismService['prisma'].advance.findUniqueOrThrow({
+      where: { id: advanceId },
+    });
+
+    if (req.user.role === 'STUDENT' && advance.studentId !== req.user.id) {
+      throw new ForbiddenException('No tiene permisos para analizar este avance');
+    }
+
     const method = body.method ?? 'copyleaks';
     if (method === 'copyleaks') {
       this.plagiarismService.analyzeWithCopyleaks(advanceId).catch(console.error);
@@ -57,8 +66,19 @@ export class PlagiarismController {
   }
 
   @Get('report/:advanceId')
-  @Roles('ADVISOR', 'COORDINATOR', 'ADMIN')
-  getReport(@Param('advanceId') advanceId: string) {
+  @Roles('STUDENT', 'ADVISOR', 'COORDINATOR', 'ADMIN')
+  async getReport(
+    @Param('advanceId') advanceId: string,
+    @Request() req: any,
+  ) {
+    const advance = await this.plagiarismService['prisma'].advance.findUniqueOrThrow({
+      where: { id: advanceId },
+    });
+
+    if (req.user.role === 'STUDENT' && advance.studentId !== req.user.id) {
+      throw new ForbiddenException('No tiene permisos para ver este reporte');
+    }
+
     return this.plagiarismService['prisma'].plagiarismReport.findFirst({
       where: { advanceId },
       include: {

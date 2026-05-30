@@ -22,6 +22,7 @@ import { StatsModule } from './stats/stats.module';
 import { StorageModule } from './storage/storage.module';
 import { AuditModule } from './audit/audit.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { AssignmentsModule } from './assignments/assignments.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     StorageModule,
     AuditModule,
     WebhooksModule,
+    AssignmentsModule,
   ],
 })
 export class AppModule {}

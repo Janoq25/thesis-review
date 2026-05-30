@@ -7,130 +7,135 @@ async function main() {
   console.log('Seeding database...');
 
   // 1. Programas académicos
-  const [progIngenieria, progEducacion, progDerecho] = await Promise.all([
-    prisma.user.upsert({
-      where: { email: "aquirozr@unitru.edu.pe" },
-      update: { role: "STUDENT", advisorId: "cmpp9fqh60008s6hordm4hw85" },
-      create: {
-        email: "aquirozr@unitru.edu.pe",
-        passwordHash: await bcrypt.hash("ThesisReview2025!", 12),
-        name: "A. Quiroz R.",
-        role: "STUDENT",
-        programId: "prog-ingenieria",
-        advisorId: "cmpp9fqh60008s6hordm4hw85"
-      }
-    }),
-    prisma.user.upsert({
-      where: { email: "lzavaletacar@unitru.edu.pe" },
-      update: { role: "STUDENT", advisorId: "cmpp9fqh60008s6hordm4hw85" },
-      create: {
-        email: "lzavaletacar@unitru.edu.pe",
-        passwordHash: await bcrypt.hash("ThesisReview2025!", 12),
-        name: "L. Zavaleta C.",
-        role: "STUDENT",
-        programId: "prog-ingenieria",
-        advisorId: "cmpp9fqh60008s6hordm4hw85"
-      }
-    }),
-    prisma.program.upsert({
-      where: { id: 'prog-ingenieria' },
-      update: {},
-      create: { id: 'prog-ingenieria', name: 'Maestría en Ingeniería de Sistemas' },
-    }),
-    prisma.program.upsert({
-      where: { id: 'prog-educacion' },
-      update: {},
-      create: { id: 'prog-educacion', name: 'Maestría en Educación' },
-    }),
-    prisma.program.upsert({
-      where: { id: 'prog-derecho' },
-      update: {},
-      create: { id: 'prog-derecho', name: 'Maestría en Derecho' },
-    }),
-  ]);
+  console.log('Seeding programs...');
+  const progIngenieria = await prisma.program.upsert({
+    where: { id: 'prog-ingenieria' },
+    update: {},
+    create: { id: 'prog-ingenieria', name: 'Maestría en Ingeniería de Sistemas' },
+  });
+  const progEducacion = await prisma.program.upsert({
+    where: { id: 'prog-educacion' },
+    update: {},
+    create: { id: 'prog-educacion', name: 'Maestría en Educación' },
+  });
+  const progDerecho = await prisma.program.upsert({
+    where: { id: 'prog-derecho' },
+    update: {},
+    create: { id: 'prog-derecho', name: 'Maestría en Derecho' },
+  });
 
   // 2. Usuarios de cada rol
   const hashedPassword = await bcrypt.hash('ThesisReview2025!', 12);
 
-  const [admin, coordinator, advisor1, advisor2, student1, student2, student3] =
-    await Promise.all([
-      prisma.user.upsert({
-        where: { email: 'admin@universidad.edu.pe' },
-        update: {},
-        create: {
-          email: 'admin@universidad.edu.pe',
-          passwordHash: hashedPassword,
-          name: 'Administrador Sistema',
-          role: 'ADMIN',
-        },
-      }),
-      prisma.user.upsert({
-        where: { email: 'coordinadora@universidad.edu.pe' },
-        update: {},
-        create: {
-          email: 'coordinadora@universidad.edu.pe',
-          passwordHash: hashedPassword,
-          name: 'María Castillo Vega',
-          role: 'COORDINATOR',
-          programId: progIngenieria.id,
-        },
-      }),
-      prisma.user.upsert({
-        where: { email: 'jperez@universidad.edu.pe' },
-        update: {},
-        create: {
-          email: 'jperez@universidad.edu.pe',
-          passwordHash: hashedPassword,
-          name: 'Dr. Jorge Pérez Sánchez',
-          role: 'ADVISOR',
-          programId: progIngenieria.id,
-        },
-      }),
-      prisma.user.upsert({
-        where: { email: 'dsalinas@universidad.edu.pe' },
-        update: {},
-        create: {
-          email: 'dsalinas@universidad.edu.pe',
-          passwordHash: hashedPassword,
-          name: 'Dra. Diana Salinas Roque',
-          role: 'ADVISOR',
-          programId: progEducacion.id,
-        },
-      }),
-      prisma.user.upsert({
-        where: { email: 'ktorres@estudiante.edu.pe' },
-        update: {},
-        create: {
-          email: 'ktorres@estudiante.edu.pe',
-          passwordHash: hashedPassword,
-          name: 'Torres Mendoza, Karla',
-          role: 'STUDENT',
-          programId: progIngenieria.id,
-        },
-      }),
-      prisma.user.upsert({
-        where: { email: 'jrivera@estudiante.edu.pe' },
-        update: {},
-        create: {
-          email: 'jrivera@estudiante.edu.pe',
-          passwordHash: hashedPassword,
-          name: 'Rivera Salas, Juan',
-          role: 'STUDENT',
-          programId: progEducacion.id,
-        },
-      }),
-      prisma.user.upsert({
-        where: { email: 'scampos@estudiante.edu.pe' },
-        update: {},
-        create: {
-          email: 'scampos@estudiante.edu.pe',
-          passwordHash: hashedPassword,
-          name: 'Campos Vera, Sandra',
-          role: 'STUDENT',
-          programId: progIngenieria.id,
-        },
-      }),
-    ]);
+  console.log('Seeding advisors and admins...');
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@universidad.edu.pe' },
+    update: {},
+    create: {
+      email: 'admin@universidad.edu.pe',
+      passwordHash: hashedPassword,
+      name: 'Administrador Sistema',
+      role: 'ADMIN',
+    },
+  });
+
+  const coordinator = await prisma.user.upsert({
+    where: { email: 'coordinadora@universidad.edu.pe' },
+    update: {},
+    create: {
+      email: 'coordinadora@universidad.edu.pe',
+      passwordHash: hashedPassword,
+      name: 'María Castillo Vega',
+      role: 'COORDINATOR',
+      programId: progIngenieria.id,
+    },
+  });
+
+  const advisor1 = await prisma.user.upsert({
+    where: { email: 'jperez@universidad.edu.pe' },
+    update: {},
+    create: {
+      id: 'cmpp9fqh60008s6hordm4hw85', // Force correct advisor ID
+      email: 'jperez@universidad.edu.pe',
+      passwordHash: hashedPassword,
+      name: 'Dr. Jorge Pérez Sánchez',
+      role: 'ADVISOR',
+      programId: progIngenieria.id,
+    },
+  });
+
+  const advisor2 = await prisma.user.upsert({
+    where: { email: 'dsalinas@universidad.edu.pe' },
+    update: {},
+    create: {
+      email: 'dsalinas@universidad.edu.pe',
+      passwordHash: hashedPassword,
+      name: 'Dra. Diana Salinas Roque',
+      role: 'ADVISOR',
+      programId: progEducacion.id,
+    },
+  });
+
+  console.log('Seeding students...');
+  const [student1, student2, student3, student4, student5] = await Promise.all([
+    prisma.user.upsert({
+      where: { email: 'ktorres@estudiante.edu.pe' },
+      update: {},
+      create: {
+        email: 'ktorres@estudiante.edu.pe',
+        passwordHash: hashedPassword,
+        name: 'Torres Mendoza, Karla',
+        role: 'STUDENT',
+        programId: progIngenieria.id,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: 'jrivera@estudiante.edu.pe' },
+      update: {},
+      create: {
+        email: 'jrivera@estudiante.edu.pe',
+        passwordHash: hashedPassword,
+        name: 'Rivera Salas, Juan',
+        role: 'STUDENT',
+        programId: progEducacion.id,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: 'scampos@estudiante.edu.pe' },
+      update: {},
+      create: {
+        email: 'scampos@estudiante.edu.pe',
+        passwordHash: hashedPassword,
+        name: 'Campos Vera, Sandra',
+        role: 'STUDENT',
+        programId: progIngenieria.id,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "aquirozr@unitru.edu.pe" },
+      update: { role: "STUDENT", advisorId: advisor1.id },
+      create: {
+        email: "aquirozr@unitru.edu.pe",
+        passwordHash: hashedPassword,
+        name: "A. Quiroz R.",
+        role: "STUDENT",
+        programId: progIngenieria.id,
+        advisorId: advisor1.id,
+      }
+    }),
+    prisma.user.upsert({
+      where: { email: "lzavaletacar@unitru.edu.pe" },
+      update: { role: "STUDENT", advisorId: advisor1.id },
+      create: {
+        email: "lzavaletacar@unitru.edu.pe",
+        passwordHash: hashedPassword,
+        name: "L. Zavaleta C.",
+        role: "STUDENT",
+        programId: progIngenieria.id,
+        advisorId: advisor1.id,
+      }
+    }),
+  ]);
 
   // 3. Asignar asesores a estudiantes
   await Promise.all([
@@ -218,6 +223,20 @@ async function main() {
     },
   });
 
+  // 4.5. Tareas (Assignments) de prueba
+  const assignment1 = await prisma.assignment.upsert({
+    where: { id: 'asg-capitulo-1' },
+    update: {},
+    create: {
+      id: 'asg-capitulo-1',
+      advisorId: advisor1.id,
+      title: '1er avance: Capítulo 1 - Introducción',
+      description: 'Subir el borrador del primer capítulo que contiene la Realidad Problemática, Objetivos y Justificación.',
+      deadlineDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // En 7 días
+      isActive: true,
+    },
+  });
+
   // 5. Advance de ejemplo con análisis IA simulado
   const advance = await prisma.advance.upsert({
     where: { id: 'adv-torres-cap2-v3' },
@@ -227,10 +246,12 @@ async function main() {
       studentId: student1.id,
       programId: progIngenieria.id,
       templateId: templateIngenieria.id,
+      assignmentId: assignment1.id,
       advanceType: 'chapter_2',
       title: 'Capítulo II: Marco Teórico v3',
+      isSimulation: false,
       version: 3,
-      fileKey: 'advances/prog-ingenieria/student1/chapter_2/v3.docx',
+      fileKey: 'advances/prog-ingenieria/student1/asg-capitulo-1/v3.docx',
       fileType: 'docx',
       fileSizeBytes: 2_450_000,
       pageCount: 42,

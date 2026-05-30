@@ -6,7 +6,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { Upload, FileText, X, CheckCircle2, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 
 const PIPELINE_STEPS = [
   'Subiendo archivos en bloque...',
@@ -26,6 +26,26 @@ export default function UploadPage() {
   const [advanceType, setAdvanceType] = useState('chapter_1');
   const [pipelineStep, setPipelineStep] = useState(-1);
   const [isDragging, setIsDragging] = useState(false);
+
+  const { data: deadlines } = useQuery({
+    queryKey: ['deadlines', programId],
+    queryFn: () => apiClient.get(`/deadlines/program/${programId}`).then((r) => r.data),
+    enabled: !!programId,
+  });
+
+  const { data: myAdvances } = useQuery({
+    queryKey: ['my-advances-upload'],
+    queryFn: () => apiClient.get('/advances/mine').then((r) => r.data),
+  });
+
+  const advances = Array.isArray(myAdvances) ? myAdvances : myAdvances?.advances ?? [];
+  const alreadySubmitted = advances.some(
+    (a: any) => a.advanceType === advanceType && !a.title?.startsWith('[SIMULACION]'),
+  );
+
+  const deadlineStr = deadlines?.[advanceType];
+  const deadlineDate = deadlineStr ? new Date(deadlineStr) : null;
+  const deadlinePassed = deadlineDate ? new Date() > deadlineDate : false;
 
   const { data: programs } = useQuery({
     queryKey: ['programs'],
@@ -61,7 +81,19 @@ export default function UploadPage() {
     },
     onSuccess: () => {
       toast.success('Archivos cargados en lote con éxito. Análisis en cola iniciado.');
-      setTimeout(() => router.push('/advances'), 2000);
+      let targetPath = '/advances';
+      try {
+        const storedUser = sessionStorage.getItem('user');
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          if (user.role === 'STUDENT') {
+            targetPath = '/student/dashboard';
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing user from session storage:', error);
+      }
+      setTimeout(() => router.push(targetPath), 2000);
     },
     onError: (err: any) => {
       setPipelineStep(-1);
@@ -89,6 +121,14 @@ export default function UploadPage() {
       toast.error('Complete todos los campos');
       return;
     }
+    if (alreadySubmitted) {
+      toast.error('Ya has presentado una entrega definitiva de este tipo');
+      return;
+    }
+    if (deadlinePassed) {
+      toast.error('La fecha límite para presentar este avance ha vencido');
+      return;
+    }
     const fd = new FormData();
     files.forEach((f) => {
       fd.append('files', f);
@@ -96,6 +136,7 @@ export default function UploadPage() {
     fd.append('programId', programId);
     fd.append('templateId', templateId);
     fd.append('advanceType', advanceType);
+    fd.append('isSimulation', 'false');
     uploadMutation.mutate(fd);
   };
 
@@ -222,15 +263,37 @@ export default function UploadPage() {
             </select>
           </div>
 
+          {alreadySubmitted && (
+            <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-xs text-amber-800">
+              Ya has presentado tu entrega definitiva para este avance. Solo se permite un envío oficial para calificación.
+            </div>
+          )}
+
+          {deadlineDate && (
+            <div className={cn(
+              "p-3 rounded-lg border text-xs flex justify-between items-center",
+              deadlinePassed ? "bg-red-50 border-red-100 text-red-800" : "bg-blue-50 border-blue-100 text-blue-800"
+            )}>
+              <span>Fecha límite de entrega oficial:</span>
+              <span className="font-semibold">{formatDate(deadlineStr)}</span>
+            </div>
+          )}
+
+          {deadlinePassed && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-xs text-red-800">
+              La fecha límite para presentar este avance ha vencido. No se permiten entregas fuera de fecha.
+            </div>
+          )}
+
           <button
             onClick={handleSubmit}
-            disabled={uploadMutation.isPending || files.length === 0 || !programId || !templateId}
+            disabled={uploadMutation.isPending || files.length === 0 || !programId || !templateId || alreadySubmitted || deadlinePassed}
             className="w-full h-10 rounded-lg bg-[#185FA5] hover:bg-[#0C447C] text-white
                        text-sm font-medium disabled:opacity-50 transition-colors
                        flex items-center justify-center gap-2"
           >
             {uploadMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-            {uploadMutation.isPending ? 'Procesando...' : 'Subir y analizar con IA'}
+            {uploadMutation.isPending ? 'Procesando...' : 'Subir y entregar para calificación'}
           </button>
         </div>
 

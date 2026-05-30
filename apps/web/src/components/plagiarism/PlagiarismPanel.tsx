@@ -18,6 +18,7 @@ const SEVERITY_CONFIG = {
 };
 
 export function PlagiarismPanel({ advanceId }: PlagiarismPanelProps) {
+
   const { data: report, refetch, isLoading } = useQuery({
     queryKey: ['plagiarism-report', advanceId],
     queryFn: () =>

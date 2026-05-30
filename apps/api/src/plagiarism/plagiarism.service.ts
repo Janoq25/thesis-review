@@ -222,7 +222,7 @@ export class PlagiarismService {
   async analyzeWithCopyleaks(advanceId: string) {
     const advance = await this.prisma.advance.findUniqueOrThrow({
       where: { id: advanceId },
-      select: { id: true, fileKey: true, fileType: true, title: true, programId: true, studentId: true, advanceType: true, version: true },
+      select: { id: true, fileKey: true, fileType: true, title: true, programId: true, studentId: true, advanceType: true, assignmentId: true, version: true },
     });
 
     // Eliminar reportes y alertas previas de este avance si existen
@@ -430,7 +430,8 @@ export class PlagiarismService {
     });
     if (!report) return;
 
-    const reportKey = `advances/${report.advance.programId}/${report.advance.studentId}/${report.advance.advanceType}/v${report.advance.version}-reporte-copyleaks.pdf`;
+    const folderName = report.advance.assignmentId || report.advance.advanceType;
+    const reportKey = `advances/${report.advance.programId}/${report.advance.studentId}/${folderName}/v${report.advance.version}-reporte-copyleaks.pdf`;
 
     // Subir el reporte PDF a MinIO/S3
     await this.storage.upload(reportKey, pdfBuffer, 'application/pdf');
