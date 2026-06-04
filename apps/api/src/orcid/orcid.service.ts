@@ -25,7 +25,7 @@ export class OrcidService {
       client_id: process.env.ORCID_CLIENT_ID!,
       response_type: 'code',
       scope: '/authenticate /read-limited',
-      redirect_uri: `${process.env.API_PUBLIC_URL}/orcid/callback`,
+      redirect_uri: process.env.ORCID_REDIRECT_URI || `${process.env.API_PUBLIC_URL}/orcid/callback`,
       state: `${userId}:${state}`,
     });
     return `${ORCID_AUTH}/authorize?${params.toString()}`;
@@ -43,7 +43,7 @@ export class OrcidService {
         client_secret: process.env.ORCID_CLIENT_SECRET!,
         grant_type: 'authorization_code',
         code,
-        redirect_uri: `${process.env.API_PUBLIC_URL}/orcid/callback`,
+        redirect_uri: process.env.ORCID_REDIRECT_URI || `${process.env.API_PUBLIC_URL}/orcid/callback`,
       }),
     });
 
@@ -126,7 +126,7 @@ export class OrcidService {
       });
     }
 
-    // Extraer keywords de publicaciones con IA (Opcional, pero no las guardamos en DB)
+    // Extraer keywords de publicaciones con IA
     const keywords = await this.extractExpertiseKeywords(
       publications.map((p) => p.title),
     );
@@ -134,7 +134,12 @@ export class OrcidService {
     // Guardar todo en BD en el campo works (Json)
     await this.prisma.orcidProfile.update({
       where: { id: profile.id },
-      data: { works: publications as any },
+      data: {
+        works: {
+          publications,
+          keywords,
+        } as any,
+      },
     });
 
     this.logger.log(`ORCID sincronizado — usuario ${userId}: ${publications.length} publicaciones`);
@@ -151,10 +156,17 @@ export class OrcidService {
 
     if (!profile) return { score: 0, matchedKeywords: [] };
 
-    // Si tuviéramos keywords guardados. Como no hay, extraemos de sus titles de works.
-    const works: any[] = (profile.works as any[]) || [];
-    const titles = works.map((w) => w.title);
-    const advisorKeywords = (await this.extractExpertiseKeywords(titles)).map(k => k.toLowerCase());
+    // Obtener keywords pre-guardadas o extraer de sus works si es un formato antiguo
+    const worksData = profile.works as any;
+    let advisorKeywords: string[] = [];
+
+    if (worksData && typeof worksData === 'object' && !Array.isArray(worksData)) {
+      advisorKeywords = (worksData.keywords || []).map((k: string) => k.toLowerCase());
+    } else {
+      const worksList = (worksData as any[]) || [];
+      const titles = worksList.map((w) => w.title);
+      advisorKeywords = (await this.extractExpertiseKeywords(titles)).map((k) => k.toLowerCase());
+    }
 
     // Extraer keywords del avance
     const advanceKeywordsRes = await this.llm.invoke([

@@ -24,6 +24,7 @@ const es = {
   },
   nav: {
     dashboard: 'Dashboard',
+    profile: 'Mi Perfil',
     uploadAdvance: 'Cargar avance',
     advances: 'Avances',
     myAdvances: 'Mis avances',

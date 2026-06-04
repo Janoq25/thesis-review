@@ -26,6 +26,7 @@ const en: Record<keyof typeof es, Record<string, string>> = {
   },
   nav: {
     dashboard: 'Dashboard',
+    profile: 'My Profile',
     uploadAdvance: 'Upload advance',
     advances: 'Advances',
     myAdvances: 'My advances',

@@ -39,8 +39,13 @@ export function OrcidProfileCard({ userId }: OrcidProfileCardProps) {
         </p>
         <Button
           size="sm"
-          onClick={() => {
-            window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/orcid/connect`;
+          onClick={async () => {
+            try {
+              const { data } = await apiClient.get<{ url: string }>('/orcid/connect');
+              window.location.href = data.url;
+            } catch {
+              toast.error('Error al conectar con ORCID');
+            }
           }}
           className="bg-[#A6CE39] hover:bg-[#7EA82D] text-white border-0"
         >

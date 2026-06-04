@@ -9,7 +9,7 @@ import { AppSettings } from '@/components/settings/AppSettings';
 import {
   LayoutDashboard, Upload, FileSearch, Layers,
   BarChart3, Settings, LogOut,
-  GraduationCap, Users, BookOpen, Menu, X,
+  GraduationCap, Users, BookOpen, Menu, X, User,
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -31,6 +31,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       { href: '/stats', labelKey: 'nav.stats' as const, icon: BarChart3, roles: ['COORDINATOR', 'ADMIN'] },
       { href: '/users', labelKey: 'nav.users' as const, icon: Users, roles: ['ADMIN'] },
       { href: '/config', labelKey: 'nav.config' as const, icon: Settings, roles: ['COORDINATOR', 'ADMIN'] },
+      { href: '/profile', labelKey: 'nav.profile' as const, icon: User, roles: ['STUDENT', 'ADVISOR', 'COORDINATOR', 'ADMIN'] },
     ],
     [],
   );
