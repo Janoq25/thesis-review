@@ -16,16 +16,16 @@ export class ReferencesController {
       where: { id: advanceId },
     });
 
-    // Obtener chunk de texto del avance de la BD
     const chunks = await this.referencesService['prisma'].advanceChunk.findMany({
       where: { advanceId },
       select: { content: true },
     });
     const fullText = chunks.map((c) => c.content).join('\n\n');
 
-    // Disparar en background
-    this.referencesService.analyzeReferences(advanceId, fullText).catch(console.error);
-    return { message: 'Análisis de referencias iniciado' };
+    console.log(`[ReferencesController] Texto recuperado para avance ${advanceId}: ${fullText.length} caracteres`);
+
+    await this.referencesService.analyzeReferences(advanceId, fullText);
+    return { message: 'Análisis de referencias completado exitosamente' };
   }
 
   @Get('report/:advanceId')
@@ -34,7 +34,7 @@ export class ReferencesController {
     return this.referencesService['prisma'].referenceAnalysis.findUnique({
       where: { advanceId },
       include: {
-        references: { orderBy: { verified: 'asc' } },
+        references: { orderBy: { verified: 'desc' } },
       },
     });
   }

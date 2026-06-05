@@ -11,7 +11,7 @@ interface KPICardProps {
 export function KPICard({ label, value, delta, loading }: KPICardProps) {
   if (loading) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-4">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
         <Skeleton className="h-3 w-24 mb-3" />
         <Skeleton className="h-8 w-16 mb-2" />
         <Skeleton className="h-3 w-20" />
@@ -20,9 +20,9 @@ export function KPICard({ label, value, delta, loading }: KPICardProps) {
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">{label}</p>
-      <p className="text-2xl font-medium text-gray-900 mb-1">{value}</p>
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{label}</p>
+      <p className="text-2xl font-medium text-gray-900 dark:text-gray-100 mb-1">{value}</p>
       {delta && (
         <p className={cn(
           'text-xs',

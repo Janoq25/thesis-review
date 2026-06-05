@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationService } from '../notifications/notifications.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 interface AnnotationDto {
   pageNumber: number;
@@ -12,10 +14,13 @@ interface AnnotationDto {
 
 @Injectable()
 export class ReviewsService {
+  private readonly logger = new Logger(ReviewsService.name);
+
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationService,
     private events: EventEmitter2,
+    @InjectQueue('email') private emailQueue: Queue,
   ) {}
 
   async getReviewPanel(advanceId: string) {
@@ -93,6 +98,19 @@ export class ReviewsService {
 
     await this.notifications.notifyReviewComplete(advanceId);
     this.events.emit('advance.reviewed', { advanceId, reviewerId, status });
+
+    // Encolar envío de correo con reporte
+    const customMessage = `Estimado(a) estudiante, tu avance ha sido revisado con el estado: ${
+      status === 'APPROVED' ? 'APROBADO' : status === 'REJECTED' ? 'RECHAZADO' : 'OBSERVADO'
+    }.\n\nNota: ${finalGrade}/20\n\nComentarios del revisor:\n${humanComment || 'Sin comentarios adicionales.'}`;
+
+    await this.emailQueue.add('send', {
+      type: 'advance_report',
+      data: {
+        advanceId,
+        customMessage,
+      },
+    }).catch((err) => this.logger.error(`Error encolando correo para avance ${advanceId}: ${err.message}`));
 
     return review;
   }

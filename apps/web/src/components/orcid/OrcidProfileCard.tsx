@@ -39,8 +39,13 @@ export function OrcidProfileCard({ userId }: OrcidProfileCardProps) {
         </p>
         <Button
           size="sm"
-          onClick={() => {
-            window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/orcid/connect`;
+          onClick={async () => {
+            try {
+              const { data } = await apiClient.get<{ url: string }>('/orcid/connect');
+              window.location.href = data.url;
+            } catch {
+              toast.error('Error al conectar con ORCID');
+            }
           }}
           className="bg-[#A6CE39] hover:bg-[#7EA82D] text-white border-0"
         >
@@ -75,16 +80,15 @@ export function OrcidProfileCard({ userId }: OrcidProfileCardProps) {
               <RefreshCw className={`h-3 w-3 mr-1 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
               Sincronizar
             </Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-              
-                href={`https://orcid.org/${profile.orcidId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink className="h-3 w-3 mr-1" />
-                Ver perfil
-              </a>
-            </Button>
+            <a
+              href={`https://orcid.org/${profile.orcidId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center h-7 px-3 rounded-md text-xs border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 transition-colors"
+            >
+              <ExternalLink className="h-3 w-3 mr-1" />
+              Ver perfil
+            </a>
           </div>
         </div>
 
@@ -132,7 +136,7 @@ export function OrcidProfileCard({ userId }: OrcidProfileCardProps) {
                   {pub.journal ?? pub.workType} · {pub.year}
                 </p>
                 {pub.doi && (
-                  
+                  <a
                     href={`https://doi.org/${pub.doi}`}
                     target="_blank"
                     rel="noopener noreferrer"

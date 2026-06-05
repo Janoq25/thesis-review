@@ -13,7 +13,6 @@ export class OrcidController {
 
   @Get('connect')
   @UseGuards(JwtAuthGuard)
-  @Redirect()
   connect(@Request() req: any) {
     const url = this.orcidService.getAuthorizationUrl(req.user.id);
     return { url };
@@ -28,10 +27,32 @@ export class OrcidController {
   @Get('profile/:userId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADVISOR', 'COORDINATOR', 'ADMIN')
-  getProfile(@Param('userId') userId: string) {
-    return this.orcidService['prisma'].orcidProfile.findUnique({
+  async getProfile(@Param('userId') userId: string) {
+    const profile = await this.orcidService['prisma'].orcidProfile.findUnique({
       where: { userId }
     });
+    if (!profile) return null;
+
+    const worksData = profile.works as any;
+    let publications: any[] = [];
+    let keywords: string[] = [];
+
+    if (worksData && typeof worksData === 'object' && !Array.isArray(worksData)) {
+      publications = worksData.publications || [];
+      keywords = worksData.keywords || [];
+    } else if (Array.isArray(worksData)) {
+      publications = worksData;
+    }
+
+    return {
+      id: profile.id,
+      userId: profile.userId,
+      orcidId: profile.orcidId,
+      name: profile.name,
+      publications,
+      keywords,
+      lastSyncedAt: profile.updatedAt,
+    };
   }
 
   @Post('sync/:userId')

@@ -19,7 +19,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@thesis-review/ai-engine": ["../../packages/ai-engine/src"],
+      "@thesis-review/shared": ["../../packages/shared/src"],
+      "@thesis-review/database": ["../../packages/database"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

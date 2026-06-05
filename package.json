@@ -1,6 +1,7 @@
 {
   "name": "thesis-review",
   "private": true,
+  "packageManager": "npm@11.4.2",
   "workspaces": [
     "apps/*",
     "packages/*"

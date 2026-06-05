@@ -1,10 +1,10 @@
 import {
   Controller, Get, Post, Patch, Param, Body,
-  UploadedFile, UseInterceptors, UseGuards,
+  UploadedFile, UploadedFiles, UseInterceptors, UseGuards,
   Request, Query, Res, HttpCode, HttpStatus,
   StreamableFile,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { AdvancesService } from './advances.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -25,24 +25,70 @@ export class AdvancesController {
   upload(
     @UploadedFile() file: Express.Multer.File,
     @Body() body: {
-      programId: string;
-      templateId: string;
-      advanceType: string;
+      programId?: string;
+      templateId?: string;
+      advanceType?: string;
+      assignmentId?: string;
+      isSimulation?: string | boolean;
     },
     @Request() req: any,
   ) {
-    // Estudiantes solo pueden subir a su propio programa
     const studentId = req.user.role === 'STUDENT'
       ? req.user.id
       : (body as any).studentId ?? req.user.id;
+
+    const isSimulation = body.isSimulation === 'true' || body.isSimulation === true;
 
     return this.advancesService.upload({
       studentId,
       programId: body.programId,
       templateId: body.templateId,
       advanceType: body.advanceType,
+      assignmentId: body.assignmentId,
+      isSimulation,
       file,
     });
+  }
+
+  @Post('bulk')
+  @UseInterceptors(FilesInterceptor('files', 20, { limits: { fileSize: 52_428_800 } }))
+  @ApiConsumes('multipart/form-data')
+  async uploadBulk(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Body() body: {
+      programId?: string;
+      templateId?: string;
+      advanceType?: string;
+      assignmentId?: string;
+      studentId?: string;
+      isSimulation?: string | boolean;
+    },
+    @Request() req: any,
+  ) {
+    const results: any[] = [];
+    const isSimulation = body.isSimulation === 'true' || body.isSimulation === true;
+    for (const file of files) {
+      try {
+        const studentId = req.user.role === 'STUDENT'
+          ? req.user.id
+          : body.studentId;
+
+        const advance = await this.advancesService.uploadBulkFile({
+          uploader: req.user,
+          programId: body.programId,
+          templateId: body.templateId,
+          advanceType: body.advanceType,
+          assignmentId: body.assignmentId,
+          studentId,
+          isSimulation,
+          file,
+        });
+        results.push({ filename: file.originalname, success: true, advanceId: advance.id });
+      } catch (error) {
+        results.push({ filename: file.originalname, success: false, error: error.message });
+      }
+    }
+    return results;
   }
 
   @Get('mine')
@@ -82,6 +128,13 @@ export class AdvancesController {
     return this.advancesService.getAdvanceDetail(id, req.user.id, req.user.role);
   }
 
+  @Post(':id/retry-ai')
+  @Roles('ADVISOR', 'COORDINATOR', 'ADMIN', 'STUDENT')
+  @HttpCode(HttpStatus.ACCEPTED)
+  retryAi(@Param('id') id: string) {
+    return this.advancesService.retryAiAnalysis(id);
+  }
+
   @Patch(':id/status')
   @Roles('ADVISOR', 'COORDINATOR', 'ADMIN')
   updateStatus(
@@ -109,6 +162,23 @@ export class AdvancesController {
     res.set({
       'Content-Type': contentType,
       'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+      'Content-Length': buffer.length,
+    });
+
+    return new StreamableFile(buffer);
+  }
+
+  @Get(':id/view')
+  async view(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { buffer, contentType, filename } =
+      await this.advancesService.downloadFile(id);
+
+    res.set({
+      'Content-Type': contentType,
+      'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
       'Content-Length': buffer.length,
     });
 

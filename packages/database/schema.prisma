@@ -64,6 +64,7 @@ model User {
   pushTokens   UserPushToken[]
   orcidProfile OrcidProfile?
   passwordResetToken PasswordResetToken?
+  assignmentsCreated Assignment[] @relation("AdvisorAssignments")
   createdAt    DateTime  @default(now())
 }
 
@@ -101,6 +102,25 @@ model Program {
   advances  Advance[]
 }
 
+model Assignment {
+  id           String          @id @default(cuid())
+  advisorId    String
+  advisor      User            @relation("AdvisorAssignments", fields: [advisorId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  startDate    DateTime?
+  deadlineDate DateTime?
+  templateId   String?
+  template     ThesisTemplate? @relation(fields: [templateId], references: [id])
+  advanceType  String          @default("chapter_1")
+  isActive     Boolean         @default(true)
+  advances     Advance[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([advisorId])
+}
+
 model ThesisTemplate {
   id              String          @id @default(cuid())
   programId       String
@@ -113,6 +133,7 @@ model ThesisTemplate {
   isActive        Boolean         @default(true)
   embeddings      TemplateChunk[]
   advances        Advance[]
+  assignments     Assignment[]
   createdAt       DateTime        @default(now())
 }
 
@@ -134,8 +155,11 @@ model Advance {
   program         Program         @relation(fields: [programId], references: [id])
   templateId      String
   template        ThesisTemplate  @relation(fields: [templateId], references: [id])
+  assignmentId    String?
+  assignment      Assignment?      @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   title           String
-  advanceType     String          // "chapter_1" | "chapter_2" | "full"
+  advanceType     String          @default("chapter_1") // "chapter_1" | "chapter_2" | "full"
+  isSimulation    Boolean         @default(false)
   version         Int             @default(1)
   fileKey         String
   fileType        String          // "pdf" | "docx"
@@ -256,14 +280,17 @@ model ReviewAnnotation {
 }
 
 model PlagiarismReport {
-  id              String              @id @default(cuid())
-  advanceId       String              @unique
-  advance         Advance             @relation(fields: [advanceId], references: [id])
-  overallSimilarity Float
-  status          String              // "pending" | "complete" | "error"
-  scanId          String?             // ID de Copyleaks
-  alerts          PlagiarismAlert[]
-  createdAt       DateTime            @default(now())
+  id                  String              @id @default(cuid())
+  advanceId           String              @unique
+  advance             Advance             @relation(fields: [advanceId], references: [id])
+  overallSimilarity   Float
+  aiScore             Float?              // Porcentaje de texto generado por IA de Copyleaks
+  method              String              @default("embeddings") // "embeddings" | "copyleaks"
+  copyleaksReportKey  String?             // Clave S3 del reporte PDF resaltado
+  status              String              // "pending" | "complete" | "error"
+  scanId              String?             // ID de Copyleaks
+  alerts              PlagiarismAlert[]
+  createdAt           DateTime            @default(now())
 }
 
 model PlagiarismAlert {
@@ -293,6 +320,7 @@ model Reference {
   title        String?
   authors      String?
   year         Int?
+  status       ReferenceStatus   @default(NOT_FOUND)
   verified     Boolean           @default(false)
   crossrefData Json?
   issues       String[]

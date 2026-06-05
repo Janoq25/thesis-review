@@ -1,4 +1,9 @@
 import { Module } from '@nestjs/common';
-@Module({})
-export class OrcidModule {}
+import { OrcidService } from './orcid.service';
+import { OrcidController } from './orcid.controller';
 
+@Module({
+  controllers: [OrcidController],
+  providers: [OrcidService],
+})
+export class OrcidModule {}

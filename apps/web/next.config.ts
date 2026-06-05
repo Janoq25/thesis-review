@@ -1,15 +1,15 @@
 import type { NextConfig } from 'next';
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
 const nextConfig: NextConfig = {
   output: 'standalone',
-  experimental: {
-    serverComponentsExternalPackages: ['puppeteer'],
-  },
+  serverExternalPackages: ['puppeteer'],
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL}/api/v1/:path*`,
+        destination: `${apiUrl}/api/v1/:path*`,
       },
     ];
   },
@@ -20,3 +20,5 @@ const nextConfig: NextConfig = {
     ],
   },
 };
+
+export default nextConfig;

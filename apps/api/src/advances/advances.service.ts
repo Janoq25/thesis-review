@@ -2,7 +2,9 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
+import * as path from 'path';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,6 +17,8 @@ const MAX_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
 @Injectable()
 export class AdvancesService {
+  private readonly logger = new Logger(AdvancesService.name);
+
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
@@ -27,12 +31,14 @@ export class AdvancesService {
 
   async upload(params: {
     studentId: string;
-    programId: string;
-    templateId: string;
-    advanceType: string;
+    programId?: string;
+    templateId?: string;
+    advanceType?: string;
+    assignmentId?: string;
+    isSimulation?: boolean;
     file: Express.Multer.File;
   }) {
-    const { studentId, programId, templateId, advanceType, file } = params;
+    let { studentId, programId, templateId, advanceType, assignmentId, isSimulation = false, file } = params;
 
     // Validaciones
     if (!ALLOWED_TYPES.includes(file.mimetype)) {
@@ -40,6 +46,48 @@ export class AdvancesService {
     }
     if (file.size > MAX_SIZE_BYTES) {
       throw new BadRequestException('El archivo supera el límite de 50 MB');
+    }
+
+    // RESOLUCIÓN DE CONFIGURACIÓN POR TAREA
+    if (assignmentId) {
+      const assignment = await this.prisma.assignment.findUnique({
+        where: { id: assignmentId },
+        include: { template: true },
+      });
+      if (!assignment) throw new NotFoundException('Tarea no encontrada');
+
+      // Validar si la tarea ya inició
+      if (assignment.startDate && new Date() < new Date(assignment.startDate)) {
+        throw new BadRequestException('La tarea aún no ha iniciado para la recepción de entregas');
+      }
+
+      // Validar si la fecha límite ya pasó (solo para entregas oficiales)
+      if (!isSimulation && assignment.deadlineDate && new Date() > new Date(assignment.deadlineDate)) {
+        throw new BadRequestException('La fecha límite para presentar este avance ha vencido');
+      }
+
+      // Validar envío único si es entrega oficial
+      if (!isSimulation) {
+        const existing = await this.prisma.advance.findFirst({
+          where: {
+            studentId,
+            assignmentId,
+            isSimulation: false,
+          },
+        });
+        if (existing) {
+          throw new BadRequestException('Ya has subido un avance para esta tarea. Solo se permite un envío oficial.');
+        }
+      }
+
+      // Sobrescribir campos con la configuración de la tarea
+      templateId = assignment.templateId || undefined;
+      advanceType = assignment.advanceType;
+      programId = assignment.template?.programId || undefined;
+    }
+
+    if (!templateId || !programId || !advanceType) {
+      throw new BadRequestException('Falta la configuración de programa, plantilla o tipo de avance para esta entrega.');
     }
 
     // Verificar que el programa y template existen
@@ -50,7 +98,7 @@ export class AdvancesService {
 
     // Calcular número de versión
     const lastVersion = await this.prisma.advance.findFirst({
-      where: { studentId, programId, advanceType },
+      where: { studentId, programId, assignmentId },
       orderBy: { version: 'desc' },
       select: { version: true },
     });
@@ -58,34 +106,43 @@ export class AdvancesService {
 
     // Subir archivo a MinIO/S3
     const fileType = file.mimetype.includes('pdf') ? 'pdf' : 'docx';
-    const fileKey = `advances/${programId}/${studentId}/${advanceType}/v${version}.${fileType}`;
+    const folderName = assignmentId || advanceType;
+    const fileKey = `advances/${programId}/${studentId}/${folderName}/v${version}.${fileType}`;
     await this.storage.upload(fileKey, file.buffer, file.mimetype);
 
     // Crear registro en BD
+    const fileName = file.originalname;
     const advance = await this.prisma.advance.create({
       data: {
         studentId,
         programId,
         templateId,
         advanceType,
+        assignmentId,
+        isSimulation,
         version,
         fileKey,
         fileType,
         fileSizeBytes: file.size,
-        title: `${advanceType} v${version}`,
+        title: fileName,
         status: 'PENDING',
       },
     });
 
+    this.logger.log(`Encolando análisis IA para avance ${advance.id}`);
+
     // Encolar jobs en paralelo
     await Promise.all([
       this.aiQueue.add('analyze', { advanceId: advance.id }, {
+        jobId: `analyze-${advance.id}`,
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: 100,
+        removeOnFail: 50,
       }),
       this.plagiarismQueue.add('analyze', {
         advanceId: advance.id,
-        method: 'embeddings',
+        method: 'copyleaks',
       }, { delay: 10_000 }), // esperar a que AI termine primero
       this.refQueue.add('check', { advanceId: advance.id }, { delay: 15_000 }),
     ]);
@@ -94,6 +151,190 @@ export class AdvancesService {
     this.events.emit('advance.created', { advanceId: advance.id, studentId });
 
     return advance;
+  }
+
+  async uploadBulkFile(params: {
+    uploader: any;
+    studentId?: string;
+    programId?: string;
+    templateId?: string;
+    advanceType?: string;
+    assignmentId?: string;
+    isSimulation?: boolean;
+    file: Express.Multer.File;
+  }) {
+    let { uploader, programId, templateId, advanceType, assignmentId, isSimulation = false, file } = params;
+    let studentId = params.studentId;
+
+    // Validaciones de archivo
+    if (!ALLOWED_TYPES.includes(file.mimetype)) {
+      throw new BadRequestException(`El archivo ${file.originalname} no es válido. Solo se aceptan PDF o Word (.docx)`);
+    }
+    if (file.size > MAX_SIZE_BYTES) {
+      throw new BadRequestException(`El archivo ${file.originalname} supera el límite de 50 MB`);
+    }
+
+    // Buscar estudiantes si no se especificó y el cargador no es estudiante
+    if (!studentId && uploader.role !== 'STUDENT') {
+      const students = await this.prisma.user.findMany({
+        where: { role: 'STUDENT' },
+      });
+      const normalizedFileName = file.originalname.toLowerCase();
+      const matchedStudent = students.find(s => {
+        if (s.email && normalizedFileName.includes(s.email.toLowerCase())) {
+          return true;
+        }
+        const nameParts = s.name.toLowerCase().split(/\s+/);
+        const matchesCount = nameParts.filter(part => part.length > 2 && normalizedFileName.includes(part)).length;
+        return matchesCount >= 2;
+      });
+
+      if (matchedStudent) {
+        studentId = matchedStudent.id;
+      } else {
+        const firstStudent = await this.prisma.user.findFirst({
+          where: { role: 'STUDENT' },
+        });
+        if (firstStudent) {
+          studentId = firstStudent.id;
+        } else {
+          studentId = uploader.id;
+        }
+      }
+    } else if (!studentId) {
+      studentId = uploader.id;
+    }
+
+    // RESOLUCIÓN DE CONFIGURACIÓN POR TAREA
+    if (assignmentId) {
+      const assignment = await this.prisma.assignment.findUnique({
+        where: { id: assignmentId },
+        include: { template: true },
+      });
+      if (!assignment) throw new NotFoundException('Tarea no encontrada');
+
+      // Validar si la tarea ya inició
+      if (assignment.startDate && new Date() < new Date(assignment.startDate)) {
+        throw new BadRequestException('La tarea aún no ha iniciado para la recepción de entregas');
+      }
+
+      // Validar si la fecha límite ya pasó (solo para entregas oficiales)
+      if (!isSimulation && assignment.deadlineDate && new Date() > new Date(assignment.deadlineDate)) {
+        throw new BadRequestException('La fecha límite para presentar este avance ha vencido');
+      }
+
+      // Validar envío único si es entrega oficial
+      if (!isSimulation && studentId) {
+        const existing = await this.prisma.advance.findFirst({
+          where: {
+            studentId,
+            assignmentId,
+            isSimulation: false,
+          },
+        });
+        if (existing) {
+          throw new BadRequestException(`El estudiante ya tiene un avance definitivo para esta tarea.`);
+        }
+      }
+
+      // Sobrescribir campos con la configuración de la tarea
+      templateId = assignment.templateId || undefined;
+      advanceType = assignment.advanceType;
+      programId = assignment.template?.programId || undefined;
+    }
+
+    if (!templateId || !programId || !advanceType) {
+      throw new BadRequestException('Falta la configuración de programa, plantilla o tipo de avance para esta entrega.');
+    }
+
+    // Verificar que el programa y template existen
+    const template = await this.prisma.thesisTemplate.findFirst({
+      where: { id: templateId, programId, isActive: true },
+    });
+    if (!template) throw new NotFoundException('Template no encontrado para este programa');
+
+    // Calcular versión
+    const lastVersion = await this.prisma.advance.findFirst({
+      where: { studentId, programId, assignmentId },
+      orderBy: { version: 'desc' },
+      select: { version: true },
+    });
+    const version = (lastVersion?.version ?? 0) + 1;
+
+    // Subir a S3
+    const fileType = file.mimetype.includes('pdf') ? 'pdf' : 'docx';
+    const folderName = assignmentId || advanceType;
+    const fileKey = `advances/${programId}/${studentId}/${folderName}/v${version}.${fileType}`;
+    await this.storage.upload(fileKey, file.buffer, file.mimetype);
+
+    // Crear registro
+    const fileName = file.originalname;
+    const advance = await this.prisma.advance.create({
+      data: {
+        studentId: studentId!,
+        programId,
+        templateId,
+        advanceType,
+        assignmentId,
+        isSimulation,
+        version,
+        fileKey,
+        fileType,
+        fileSizeBytes: file.size,
+        title: fileName,
+        status: 'PENDING',
+      },
+    });
+
+    this.logger.log(`[BULK] Encolando análisis IA para avance ${advance.id}`);
+
+    // Encolar jobs con retrasos escalonados para distribuir consumo de tokens
+    await Promise.all([
+      this.aiQueue.add('analyze', { advanceId: advance.id }, {
+        jobId: `analyze-${advance.id}`,
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 10000 },
+        removeOnComplete: 100,
+        removeOnFail: 50,
+      }),
+      this.plagiarismQueue.add('analyze', {
+        advanceId: advance.id,
+        method: 'copyleaks',
+      }, { delay: 15_000 }),
+      this.refQueue.add('check', { advanceId: advance.id }, { delay: 20_000 }),
+    ]);
+
+    // Emitir evento para audit log
+    this.events.emit('advance.created', { advanceId: advance.id, studentId });
+
+    return advance;
+  }
+
+  async retryAiAnalysis(advanceId: string) {
+    const advance = await this.prisma.advance.findUniqueOrThrow({
+      where: { id: advanceId },
+      select: { id: true, status: true },
+    });
+
+    if (!['PENDING', 'AI_PROCESSING'].includes(advance.status)) {
+      throw new BadRequestException(
+        `Solo se puede reintentar análisis en estado PENDING o AI_PROCESSING (actual: ${advance.status})`,
+      );
+    }
+
+    this.logger.warn(`Reencolando análisis IA para avance ${advanceId}`);
+
+    await this.aiQueue.add(
+      'analyze',
+      { advanceId },
+      {
+        jobId: `analyze-${advanceId}-retry-${Date.now()}`,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+      },
+    );
+
+    return { advanceId, queued: true };
   }
 
   async getAdvanceDetail(advanceId: string, requesterId: string, requesterRole: string) {
@@ -131,6 +372,12 @@ export class AdvancesService {
             _count: { select: { findings: true } },
           },
         },
+        plagiarismReport: {
+          select: { overallSimilarity: true, status: true },
+        },
+        review: {
+          select: { finalGrade: true, status: true },
+        },
         program: { select: { name: true } },
       },
       orderBy: [{ advanceType: 'asc' }, { version: 'desc' }],
@@ -148,6 +395,7 @@ export class AdvancesService {
 
     const where: any = {
       student: { advisorId },
+      isSimulation: false,
       ...(status && { status }),
       ...(programId && { programId }),
     };
@@ -159,6 +407,9 @@ export class AdvancesService {
           student: { select: { id: true, name: true } },
           program: { select: { name: true } },
           aiAnalysis: { select: { overallScore: true, gradeConverted: true } },
+          plagiarismReport: {
+            select: { overallSimilarity: true, status: true },
+          },
           review: { select: { status: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -238,6 +489,7 @@ export class AdvancesService {
     const { status, programId, page = 1, pageSize = 20 } = filters;
     const skip = (page - 1) * pageSize;
     const where: any = {
+      isSimulation: false,
       ...(status && { status }),
       ...(programId && { programId }),
     };
@@ -249,6 +501,9 @@ export class AdvancesService {
           student: { select: { id: true, name: true } },
           program: { select: { name: true } },
           aiAnalysis: { select: { overallScore: true, gradeConverted: true } },
+          plagiarismReport: {
+            select: { overallSimilarity: true, status: true },
+          },
           review: { select: { status: true, finalGrade: true } },
         },
         orderBy: { createdAt: 'desc' },

@@ -6,27 +6,46 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { Upload, FileText, X, CheckCircle2, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 
 const PIPELINE_STEPS = [
-  'Subiendo archivo...',
-  'Extrayendo texto (mammoth.js / pdf-parse)...',
-  'Segmentando en chunks (LangChain.js)...',
-  'Generando embeddings (text-embedding-3-large)...',
-  'Comparando con documento patrón...',
-  'Analizando con GPT-4o...',
-  'Guardando hallazgos...',
-  'Análisis completado',
+  'Subiendo archivos en bloque...',
+  'Extrayendo textos en paralelo (pdf-parse / mammoth)...',
+  'Segmentando documentos en chunks...',
+  'Generando embeddings vectoriales...',
+  'Preparando cola de análisis IA...',
+  'Iniciando procesamiento secuencial con GPT-4o...',
+  'Lote procesado exitosamente',
 ];
 
 export default function UploadPage() {
   const router = useRouter();
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [programId, setProgramId] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [advanceType, setAdvanceType] = useState('chapter_1');
   const [pipelineStep, setPipelineStep] = useState(-1);
   const [isDragging, setIsDragging] = useState(false);
+
+  const { data: deadlines } = useQuery({
+    queryKey: ['deadlines', programId],
+    queryFn: () => apiClient.get(`/deadlines/program/${programId}`).then((r) => r.data),
+    enabled: !!programId,
+  });
+
+  const { data: myAdvances } = useQuery({
+    queryKey: ['my-advances-upload'],
+    queryFn: () => apiClient.get('/advances/mine').then((r) => r.data),
+  });
+
+  const advances = Array.isArray(myAdvances) ? myAdvances : myAdvances?.advances ?? [];
+  const alreadySubmitted = advances.some(
+    (a: any) => a.advanceType === advanceType && !a.title?.startsWith('[SIMULACION]'),
+  );
+
+  const deadlineStr = deadlines?.[advanceType];
+  const deadlineDate = deadlineStr ? new Date(deadlineStr) : null;
+  const deadlinePassed = deadlineDate ? new Date() > deadlineDate : false;
 
   const { data: programs } = useQuery({
     queryKey: ['programs'],
@@ -41,16 +60,15 @@ export default function UploadPage() {
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      // Simular progreso del pipeline
       let step = 0;
       const interval = setInterval(() => {
         if (step < PIPELINE_STEPS.length - 2) {
           setPipelineStep(step++);
         }
-      }, 1200);
+      }, 1500);
 
       try {
-        const result = await apiClient.post('/advances', formData, {
+        const result = await apiClient.post('/advances/bulk', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         clearInterval(interval);
@@ -61,50 +79,77 @@ export default function UploadPage() {
         throw err;
       }
     },
-    onSuccess: (data) => {
-      toast.success('Avance cargado. Análisis IA iniciado en background.');
-      setTimeout(() => router.push(`/advances/${data.id}/review`), 1500);
+    onSuccess: () => {
+      toast.success('Archivos cargados en lote con éxito. Análisis en cola iniciado.');
+      let targetPath = '/advances';
+      try {
+        const storedUser = sessionStorage.getItem('user');
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          if (user.role === 'STUDENT') {
+            targetPath = '/student/dashboard';
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing user from session storage:', error);
+      }
+      setTimeout(() => router.push(targetPath), 2000);
     },
     onError: (err: any) => {
       setPipelineStep(-1);
-      toast.error(err.response?.data?.message ?? 'Error al subir el archivo');
+      toast.error(err.response?.data?.message ?? 'Error al subir los archivos');
     },
   });
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    const dropped = e.dataTransfer.files[0];
-    if (dropped && (dropped.type.includes('pdf') || dropped.name.endsWith('.docx'))) {
-      setFile(dropped);
-    } else {
-      toast.error('Solo se aceptan archivos PDF o Word (.docx)');
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    const validFiles = droppedFiles.filter(
+      (f) => f.type.includes('pdf') || f.name.endsWith('.docx')
+    );
+    if (validFiles.length > 0) {
+      setFiles((prev) => [...prev, ...validFiles]);
+    }
+    if (validFiles.length < droppedFiles.length) {
+      toast.error('Algunos archivos fueron omitidos. Solo se aceptan PDF o Word (.docx)');
     }
   }, []);
 
   const handleSubmit = () => {
-    if (!file || !programId || !templateId) {
+    if (files.length === 0 || !programId || !templateId) {
       toast.error('Complete todos los campos');
       return;
     }
+    if (alreadySubmitted) {
+      toast.error('Ya has presentado una entrega definitiva de este tipo');
+      return;
+    }
+    if (deadlinePassed) {
+      toast.error('La fecha límite para presentar este avance ha vencido');
+      return;
+    }
     const fd = new FormData();
-    fd.append('file', file);
+    files.forEach((f) => {
+      fd.append('files', f);
+    });
     fd.append('programId', programId);
     fd.append('templateId', templateId);
     fd.append('advanceType', advanceType);
+    fd.append('isSimulation', 'false');
     uploadMutation.mutate(fd);
   };
 
   return (
-    <div className="p-6 max-w-3xl">
-      <div className="mb-6">
-        <h1 className="text-xl font-medium text-gray-900">Cargar nuevo avance</h1>
-        <p className="text-sm text-gray-500 mt-1">
+    <div className="p-3 sm:p-6 max-w-3xl">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-base sm:text-xl font-medium text-gray-900">Cargar nuevo avance</h1>
+        <p className="text-xs sm:text-sm text-gray-500 mt-1">
           El análisis IA se inicia automáticamente al subir el documento.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
         {/* Formulario */}
         <div className="lg:col-span-3 space-y-5">
           {/* Drop zone */}
@@ -112,43 +157,62 @@ export default function UploadPage() {
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
-            onClick={() => !file && document.getElementById('file-input')?.click()}
+            onClick={() => files.length === 0 && document.getElementById('file-input')?.click()}
             className={cn(
-              'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors',
+              'border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors',
               isDragging ? 'border-[#185FA5] bg-blue-50' : 'border-gray-200 hover:border-gray-300',
-              file && 'cursor-default',
+              files.length > 0 && 'cursor-default',
             )}
           >
             <input
               id="file-input"
               type="file"
               accept=".pdf,.docx"
+              multiple
               className="hidden"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const selected = Array.from(e.target.files ?? []);
+                setFiles((prev) => [...prev, ...selected]);
+              }}
             />
-            {file ? (
-              <div className="flex items-center justify-center gap-3">
-                <FileText className="w-8 h-8 text-[#185FA5]" />
-                <div className="text-left">
-                  <p className="text-sm font-medium text-gray-900">{file.name}</p>
-                  <p className="text-xs text-gray-500">
-                    {(file.size / 1024 / 1024).toFixed(1)} MB
-                  </p>
+            {files.length > 0 ? (
+              <div className="space-y-2 text-left max-h-48 overflow-y-auto">
+                <p className="text-xs font-semibold text-gray-500 mb-2">Archivos seleccionados ({files.length}):</p>
+                {files.map((file, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-3 bg-white p-2 rounded-lg border border-gray-150 shadow-sm">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <FileText className="w-5 h-5 text-[#185FA5] flex-shrink-0" />
+                      <span className="text-xs font-medium text-gray-900 truncate">{file.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-[10px] text-gray-500 font-mono">
+                        {(file.size / 1024 / 1024).toFixed(1)} MB
+                      </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setFiles((prev) => prev.filter((_, i) => i !== idx)); }}
+                        className="text-gray-400 hover:text-red-500 p-1"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <div className="pt-2 text-center">
+                  <button
+                    onClick={() => document.getElementById('file-input')?.click()}
+                    className="text-xs font-semibold text-[#185FA5] hover:text-[#0C447C] inline-flex items-center gap-1 bg-blue-50 px-3 py-1.5 rounded-lg border border-[#185FA5]/20"
+                  >
+                    + Agregar más archivos
+                  </button>
                 </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                  className="text-gray-400 hover:text-red-500 ml-2"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
             ) : (
               <>
                 <Upload className="w-8 h-8 text-gray-400 mx-auto mb-3" />
                 <p className="text-sm font-medium text-gray-700">
-                  Arrastra o haz clic para seleccionar
+                  Arrastra o haz clic para seleccionar archivos
                 </p>
-                <p className="text-xs text-gray-400 mt-1">Word (.docx) o PDF · máx. 50 MB</p>
+                <p className="text-xs text-gray-400 mt-1">Word (.docx) o PDF · puedes seleccionar varios</p>
               </>
             )}
           </div>
@@ -192,23 +256,44 @@ export default function UploadPage() {
               onChange={(e) => setAdvanceType(e.target.value)}
               className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm"
             >
-              <option value="chapter_1">Capítulo 1 — Problema de investigación</option>
-              <option value="chapter_2">Capítulo 2 — Marco teórico</option>
-              <option value="chapter_3">Capítulo 3 — Metodología</option>
-              <option value="chapter_4">Capítulo 4 — Resultados</option>
+              <option value="chapter_1">CAPITULO I: INTRODUCCIÓN</option>
+              <option value="chapter_2">CAPITULO II: MÉTODO</option>
+              <option value="chapter_3">CAPITULO III: ASPECTOS ADMINISTRATIVOS</option>
               <option value="full">Avance completo</option>
             </select>
           </div>
 
+          {alreadySubmitted && (
+            <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-xs text-amber-800">
+              Ya has presentado tu entrega definitiva para este avance. Solo se permite un envío oficial para calificación.
+            </div>
+          )}
+
+          {deadlineDate && (
+            <div className={cn(
+              "p-3 rounded-lg border text-xs flex justify-between items-center",
+              deadlinePassed ? "bg-red-50 border-red-100 text-red-800" : "bg-blue-50 border-blue-100 text-blue-800"
+            )}>
+              <span>Fecha límite de entrega oficial:</span>
+              <span className="font-semibold">{formatDate(deadlineStr)}</span>
+            </div>
+          )}
+
+          {deadlinePassed && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-xs text-red-800">
+              La fecha límite para presentar este avance ha vencido. No se permiten entregas fuera de fecha.
+            </div>
+          )}
+
           <button
             onClick={handleSubmit}
-            disabled={uploadMutation.isPending || !file || !programId || !templateId}
+            disabled={uploadMutation.isPending || files.length === 0 || !programId || !templateId || alreadySubmitted || deadlinePassed}
             className="w-full h-10 rounded-lg bg-[#185FA5] hover:bg-[#0C447C] text-white
                        text-sm font-medium disabled:opacity-50 transition-colors
                        flex items-center justify-center gap-2"
           >
             {uploadMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-            {uploadMutation.isPending ? 'Procesando...' : 'Subir y analizar con IA'}
+            {uploadMutation.isPending ? 'Procesando...' : 'Subir y entregar para calificación'}
           </button>
         </div>
 

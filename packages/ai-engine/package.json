@@ -2,12 +2,23 @@
   "name": "@thesis-review/ai-engine",
   "version": "1.0.0",
   "private": true,
-  "main": "src/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  },
   "dependencies": {
     "@langchain/openai": "^0.2.0",
     "langchain": "^0.2.0",
     "mammoth": "^1.7.0",
-    "pdf-parse": "^1.1.1"
+    "pdf-parse": "^1.1.1",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "typescript": "^5.4.0"

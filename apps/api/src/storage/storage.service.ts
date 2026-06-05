@@ -19,9 +19,10 @@ export class StorageService implements OnModuleInit {
 
   async onModuleInit() {
     const exists = await this.client.bucketExists(this.bucket);
-    if (!exists) {
+    if (exists) return;
+
+    try {
       await this.client.makeBucket(this.bucket, 'us-east-1');
-      // Política: archivos privados, solo acceso por presigned URL
       await this.client.setBucketPolicy(
         this.bucket,
         JSON.stringify({
@@ -29,6 +30,11 @@ export class StorageService implements OnModuleInit {
           Statement: [{ Effect: 'Deny', Principal: '*', Action: 's3:GetObject', Resource: `arn:aws:s3:::${this.bucket}/*` }],
         }),
       );
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code !== 'BucketAlreadyOwnedByYou' && code !== 'BucketAlreadyExists') {
+        throw err;
+      }
     }
   }
 
@@ -49,7 +55,18 @@ export class StorageService implements OnModuleInit {
   }
 
   async getPresignedUrl(key: string, expirySeconds = 3600): Promise<string> {
-    return this.client.presignedGetObject(this.bucket, key, expirySeconds);
+    // Generamos la URL firmada.
+    // Usamos un objeto vacío para params para evitar que se incluyan metadatos innecesarios 
+    // que causen el error "MetadataTooLarge".
+    const url = await this.client.presignedGetObject(this.bucket, key, expirySeconds);
+    
+    // Reemplazo de hostname para acceso desde el navegador (fuera de Docker)
+    const internalHost = process.env.MINIO_ENDPOINT ?? 'minio';
+    if (url.includes(`://${internalHost}:`)) {
+      return url.replace(`://${internalHost}:`, '://localhost:');
+    }
+    
+    return url;
   }
 
   async delete(key: string): Promise<void> {
