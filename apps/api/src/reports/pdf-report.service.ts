@@ -22,172 +22,253 @@ export class PdfReportService {
       },
     });
 
-    this.logger.log(`Generando reporte PDF profesional e integral para avance ${advanceId}`);
+    this.logger.log(`Generando reporte PDF profesional detallado para avance ${advanceId}`);
 
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
+      const doc = new PDFDocument({ 
+        margin: 50, 
+        size: "A4", 
+        bufferPages: true,
+        autoFirstPage: true 
+      });
       const chunks: Buffer[] = [];
 
       doc.on("data", (chunk) => chunks.push(chunk));
       doc.on("end", () => resolve(Buffer.concat(chunks)));
       doc.on("error", reject);
 
-      const primaryColor = "#185FA5";
-      const secondaryColor = "#4B5563";
-      const darkColor = "#1F2937";
-      const lightBg = "#F9FAFB";
-      const borderLineColor = "#E5E7EB";
-
-      const drawHeader = (title: string) => {
-        doc.fillColor(primaryColor).rect(50, 40, 495, 40).fill();
-        doc.fillColor("#FFFFFF").fontSize(14).font("Helvetica-Bold").text(title, 65, 55);
-        doc.fontSize(8).font("Helvetica").text("THESISREVIEW SYSTEM", 400, 58, { align: "right" });
-        doc.y = 100;
+      const colors = {
+        primary: "#185FA5",
+        secondary: "#4B5563",
+        dark: "#1F2937",
+        lightBg: "#F9FAFB",
+        border: "#E5E7EB",
+        critical: "#B91C1C",
+        major: "#B45309",
+        minor: "#1D4ED8",
+        success: "#059669"
       };
 
-      const drawFooter = () => {
-        const totalPages = doc.bufferedPageRange().count;
-        for (let i = 0; i < totalPages; i++) {
-          doc.switchToPage(i);
-          doc.fillColor(secondaryColor).fontSize(8).font("Helvetica")
-             .text(`Generado automáticamente por ThesisReview Hub · Página ${i + 1} de ${totalPages}`, 50, 785, { align: "center" });
-        }
+      const drawHeader = (title: string) => {
+        doc.fillColor(colors.primary).rect(0, 0, 595.28, 80).fill();
+        doc.fillColor("#FFFFFF").fontSize(16).font("Helvetica-Bold").text(title, 50, 32);
+        doc.fontSize(8).font("Helvetica").text("PLATAFORMA DE GESTIÓN ACADÉMICA", 50, 55);
+        doc.text("THESISREVIEW HUB", 400, 55, { align: "right", width: 145 });
+        doc.y = 110;
       };
 
       const drawSectionTitle = (title: string) => {
-        doc.moveDown(1);
-        doc.fillColor(primaryColor).font("Helvetica-Bold").fontSize(12).text(title);
-        doc.strokeColor(primaryColor).lineWidth(1).moveTo(50, doc.y + 2).lineTo(545, doc.y + 2).stroke();
+        doc.moveDown(1.5);
+        const currentY = doc.y;
+        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(13).text(title.toUpperCase());
+        doc.strokeColor(colors.primary).lineWidth(1.5).moveTo(50, currentY + 18).lineTo(545, currentY + 18).stroke();
         doc.moveDown(1);
       };
 
-      // PAGE 1: PORTADA
+      // --- PAGE 1: PORTADA ---
       drawHeader("REPORTE INTEGRAL DE EVALUACIÓN");
-      doc.moveDown(1.5);
-      doc.fillColor(darkColor).fontSize(18).font("Helvetica-Bold").text(advance.title, { align: "center" });
+
+      doc.moveDown(1);
+      doc.fillColor(colors.dark).fontSize(20).font("Helvetica-Bold").text(advance.title, { align: "center" });
       doc.moveDown(2);
 
-      doc.fillColor(lightBg).rect(50, doc.y, 495, 140).fill();
-      doc.strokeColor(borderLineColor).lineWidth(1).rect(50, doc.y, 495, 140).stroke();
+      // FICHA TÉCNICA
+      doc.fillColor(colors.lightBg).rect(50, doc.y, 495, 160).fill();
+      doc.strokeColor(colors.border).lineWidth(1).rect(50, doc.y, 495, 160).stroke();
       
-      let technicalY = doc.y + 15;
-      const drawRow = (label: string, value: string) => {
-        doc.fillColor(secondaryColor).font("Helvetica-Bold").fontSize(9).text(label, 70, technicalY);
-        doc.fillColor(darkColor).font("Helvetica").fontSize(10).text(value, 180, technicalY);
-        technicalY += 20;
+      let ty = doc.y + 20;
+      const row = (l: string, v: string) => {
+        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(10).text(l, 75, ty);
+        doc.fillColor(colors.dark).font("Helvetica").fontSize(11).text(v, 200, ty);
+        ty += 22;
       };
 
-      drawRow("Estudiante:", advance.student.name);
-      drawRow("Programa Académico:", advance.program.name);
-      drawRow("Asesor a Cargo:", advance.student.advisor?.name ?? "No asignado");
-      drawRow("Tipo de Avance:", `${advance.advanceType.replace("_", " ").toUpperCase()} (v${advance.version})`);
-      drawRow("Plantilla / Rúbrica:", `${advance.template.name} (v${advance.template.version})`);
-      drawRow("Fecha de Evaluación:", new Date().toLocaleDateString("es-PE"));
+      row("Estudiante:", advance.student.name);
+      row("Programa:", advance.program.name);
+      row("Asesor:", advance.student.advisor?.name ?? "No asignado");
+      row("Tipo de Avance:", `${advance.advanceType.replace("_", " ").toUpperCase()} (v${advance.version})`);
+      row("Plantilla:", `${advance.template.name}`);
+      row("Fecha Reporte:", new Date().toLocaleDateString("es-PE"));
 
-      doc.y = technicalY + 15;
+      doc.y = ty + 20;
+
       if (advance.aiAnalysis?.executiveSummary) {
-        drawSectionTitle("RESUMEN EJECUTIVO");
-        doc.fillColor(darkColor).font("Helvetica").fontSize(10).text(advance.aiAnalysis.executiveSummary, { align: "justify", lineGap: 3 });
+        drawSectionTitle("Resumen Ejecutivo de la Evaluación");
+        doc.fillColor(colors.dark).font("Helvetica").fontSize(10.5).text(advance.aiAnalysis.executiveSummary, { align: "justify", lineGap: 3 });
       }
 
-      // PAGE 2: MÉTRICAS
+      // --- PAGE 2: ANÁLISIS DE CALIDAD IA ---
       doc.addPage();
-      drawHeader("MÉTRICAS DE CALIDAD IA");
+      drawHeader("I. ANÁLISIS DE CALIDAD POR IA");
+
       if (advance.aiAnalysis) {
-        const startY = 120;
-        const cardWidth = 110;
-        const drawMetric = (title: string, score: number, index: number) => {
-          const x = 50 + index * (cardWidth + 15);
-          doc.fillColor("#FFFFFF").rect(x, startY, cardWidth, 70).fill();
-          doc.strokeColor(borderLineColor).lineWidth(1).rect(x, startY, cardWidth, 70).stroke();
-          doc.fillColor(primaryColor).rect(x, startY, cardWidth, 4).fill();
-          doc.fillColor(secondaryColor).font("Helvetica-Bold").fontSize(8).text(title.toUpperCase(), x + 10, startY + 15, { width: cardWidth - 20, align: "center" });
-          doc.fillColor(darkColor).font("Helvetica-Bold").fontSize(20).text(`${score.toFixed(0)}%`, x, startY + 35, { width: cardWidth, align: "center" });
+        // Tarjetas de Métricas
+        const cardW = 110;
+        const cardH = 75;
+        const startY = doc.y;
+        
+        const metric = (t: string, s: number, i: number) => {
+          const x = 50 + i * (cardW + 15);
+          doc.fillColor("#FFFFFF").rect(x, startY, cardW, cardH).fill();
+          doc.strokeColor(colors.border).lineWidth(1).rect(x, startY, cardW, cardH).stroke();
+          doc.fillColor(colors.primary).rect(x, startY, cardW, 5).fill();
+          doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(8).text(t, x, startY + 18, { width: cardW, align: "center" });
+          doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(22).text(`${s.toFixed(0)}%`, x, startY + 38, { width: cardW, align: "center" });
         };
-        drawMetric("Estructura", advance.aiAnalysis.structureScore, 0);
-        drawMetric("Contenido", advance.aiAnalysis.contentScore, 1);
-        drawMetric("Redacción", advance.aiAnalysis.formScore, 2);
-        drawMetric("Originalidad", advance.aiAnalysis.originalityScore, 3);
-        doc.y = startY + 110;
-        doc.fillColor("#EFF6FF").rect(50, doc.y, 495, 45).fill();
-        doc.fillColor("#1E40AF").font("Helvetica-Bold").fontSize(14).text(`PUNTAJE IA CONVERTIDO: ${advance.aiAnalysis.gradeConverted.toFixed(1)} / 20`, 50, doc.y + 16, { align: "center" });
-        doc.y += 80;
-        drawSectionTitle("HALLAZGOS Y RECOMENDACIONES");
-        advance.aiAnalysis.findings.forEach((f) => {
-          if (doc.y > 700) { doc.addPage(); drawHeader("HALLAZGOS (CONT.)"); doc.y = 120; }
-          const color = f.severity === "CRITICAL" ? "#B91C1C" : f.severity === "MAJOR" ? "#B45309" : "#1D4ED8";
-          doc.fillColor(color).font("Helvetica-Bold").fontSize(10).text(`[${f.severity}] ${f.sectionRef}`);
-          doc.fillColor(darkColor).font("Helvetica").fontSize(9).text(f.description, { align: "justify" });
-          doc.fillColor(secondaryColor).font("Helvetica-Oblique").fontSize(9).text(`Recomendación: ${f.recommendation}`, { indent: 10 });
-          doc.moveDown(0.8);
-        });
-      }
 
-      // PAGE 3: PLAGIO
-      doc.addPage();
-      drawHeader("ANÁLISIS DE SIMILITUD Y PLAGIO");
-      if (advance.plagiarismReport) {
-        const report = advance.plagiarismReport;
-        doc.moveDown(1);
-        doc.fillColor("#FEF2F2").rect(50, doc.y, 230, 60).fill();
-        doc.fillColor("#991B1B").font("Helvetica-Bold").fontSize(9).text("SIMILITUD TOTAL", 65, doc.y + 15);
-        doc.fontSize(18).text(`${report.overallSimilarity.toFixed(1)}%`, 65, doc.y + 28);
-        if (report.aiScore !== null) {
-          doc.fillColor("#F5F3FF").rect(315, doc.y - 60, 230, 60).fill();
-          doc.fillColor("#5B21B6").font("Helvetica-Bold").fontSize(9).text("PROBABILIDAD DE IA", 330, doc.y - 45);
-          doc.fontSize(18).text(`${report.aiScore.toFixed(1)}%`, 330, doc.y - 32);
-        }
-        doc.y += 20;
-        drawSectionTitle("FUENTES COINCIDENTES");
-        report.alerts.forEach((a, i) => {
-          if (doc.y > 700) { doc.addPage(); drawHeader("FUENTES (CONT.)"); doc.y = 120; }
-          doc.fillColor(darkColor).font("Helvetica-Bold").fontSize(9).text(`${i+1}. Coincidencia de ${(a.similarity * 100).toFixed(1)}%`);
-          doc.fillColor("#2563EB").fontSize(8).text(a.sourceUrl || "Documento Interno", { underline: true });
+        metric("ESTRUCTURA", advance.aiAnalysis.structureScore, 0);
+        metric("CONTENIDO", advance.aiAnalysis.contentScore, 1);
+        metric("REDACCIÓN", advance.aiAnalysis.formScore, 2);
+        metric("ORIGINALIDAD", advance.aiAnalysis.originalityScore, 3);
+
+        doc.y = startY + cardH + 30;
+        doc.fillColor("#EFF6FF").rect(50, doc.y, 495, 50).fill();
+        doc.fillColor("#1E40AF").font("Helvetica-Bold").fontSize(15).text(`PUNTAJE GLOBAL IA: ${advance.aiAnalysis.gradeConverted.toFixed(1)} / 20.0`, 50, doc.y + 18, { align: "center" });
+
+        doc.y += 80;
+        drawSectionTitle("Hallazgos Detallados de la IA");
+
+        advance.aiAnalysis.findings.forEach((f, idx) => {
+          if (doc.y > 680) { doc.addPage(); drawHeader("I. ANÁLISIS IA (CONTINUACIÓN)"); doc.y = 110; }
+          
+          const sevColor = f.severity === "CRITICAL" ? colors.critical : f.severity === "MAJOR" ? colors.major : colors.minor;
+          doc.fillColor(sevColor).font("Helvetica-Bold").fontSize(10).text(`${idx + 1}. [${f.severity}] - Sección: ${f.sectionRef}`);
+          
+          doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(9).text("Observación: ", { continued: true });
+          doc.font("Helvetica").text(f.description, { align: "justify" });
+          
+          doc.font("Helvetica-Bold").text("Pasos de corrección: ", { continued: true });
+          doc.font("Helvetica").text(f.correctionSteps);
+          
+          if (f.exampleImprovement) {
+            doc.fillColor(colors.success).font("Helvetica-Oblique").fontSize(9).text(`Ejemplo sugerido: "${f.exampleImprovement}"`, { indent: 15 });
+          }
+          
+          doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(9).text("Recomendación final: ", { continued: true });
+          doc.font("Helvetica").text(f.recommendation);
+          
+          doc.moveDown(1);
+          doc.strokeColor(colors.border).lineWidth(0.5).moveTo(70, doc.y).lineTo(525, doc.y).stroke();
           doc.moveDown(0.5);
         });
       }
 
-      // PAGE 4: REFERENCIAS
+      // --- PAGE 3: SIMILITUD Y PLAGIO ---
       doc.addPage();
-      drawHeader("VALIDACIÓN DE REFERENCIAS (APA)");
+      drawHeader("II. ANÁLISIS DE SIMILITUD (COPYLEAKS)");
+
+      if (advance.plagiarismReport) {
+        const p = advance.plagiarismReport;
+        
+        doc.fillColor(p.overallSimilarity > 25 ? "#FEF2F2" : "#F0FDF4").rect(50, doc.y, 235, 70).fill();
+        doc.fillColor(p.overallSimilarity > 25 ? colors.critical : colors.success).font("Helvetica-Bold").fontSize(10).text("ÍNDICE DE SIMILITUD", 65, doc.y + 15);
+        doc.fontSize(24).text(`${p.overallSimilarity.toFixed(1)}%`, 65, doc.y + 32);
+
+        if (p.aiScore !== null) {
+          doc.fillColor("#F5F3FF").rect(310, doc.y - 70, 235, 70).fill();
+          doc.fillColor("#5B21B6").font("Helvetica-Bold").fontSize(10).text("PROBABILIDAD DE TEXTO POR IA", 325, doc.y - 55);
+          doc.fontSize(24).text(`${p.aiScore.toFixed(1)}%`, 325, doc.y - 38);
+        }
+
+        doc.y += 30;
+        drawSectionTitle("Fuentes de Coincidencia Detectadas");
+
+        if (p.alerts && p.alerts.length > 0) {
+          p.alerts.forEach((a, i) => {
+            if (doc.y > 680) { doc.addPage(); drawHeader("II. SIMILITUD (CONTINUACIÓN)"); doc.y = 110; }
+            
+            doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(10).text(`${i + 1}. Coincidencia del ${(a.similarity * 100).toFixed(1)}%`);
+            doc.fillColor("#2563EB").fontSize(9).text(`URL: ${a.sourceUrl || "Base de datos interna"}`, { underline: true });
+            
+            if (a.matchedText) {
+              doc.fillColor(colors.secondary).font("Helvetica-Oblique").fontSize(8.5).text(`Fragmento detectado: "${a.matchedText.substring(0, 300)}..."`, { indent: 10, lineGap: 2 });
+            }
+            doc.moveDown(1);
+          });
+        } else {
+          doc.fillColor(colors.secondary).font("Helvetica-Oblique").fontSize(11).text("No se detectaron fuentes de similitud por encima del umbral permitido.");
+        }
+      }
+
+      // --- PAGE 4: REFERENCIAS BIBLIOGRÁFICAS ---
+      doc.addPage();
+      drawHeader("III. VERIFICACIÓN DE REFERENCIAS (APA 7)");
+
       if (advance.referenceAnalysis) {
-        drawSectionTitle("ESTADO DE BIBLIOGRAFÍA");
         const refs = advance.referenceAnalysis.references;
-        doc.fillColor(lightBg).rect(50, doc.y, 495, 50).fill();
-        doc.fillColor(darkColor).font("Helvetica").fontSize(10).text(`Total analizadas: ${refs.length}`, 70, doc.y + 15);
-        const verified = refs.filter(r => r.status === "VERIFIED").length;
-        doc.text(`Verificadas en CrossRef: ${verified}`, 70, doc.y + 30);
-        doc.y += 70;
-        refs.forEach(r => {
-          if (doc.y > 720) { doc.addPage(); drawHeader("REFERENCIAS (CONT.)"); doc.y = 120; }
-          const color = r.status === "VERIFIED" ? "#059669" : r.status === "POSSIBLE_HALLUCINATION" ? "#DC2626" : "#D97706";
-          doc.fillColor(color).font("Helvetica-Bold").fontSize(8).text(`[${r.status}]`, { continued: true });
-          doc.fillColor(darkColor).font("Helvetica").fontSize(8).text(` ${r.rawText}`);
-          doc.moveDown(0.3);
+        
+        doc.fillColor(colors.lightBg).rect(50, doc.y, 495, 60).fill();
+        doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(10).text(`Total Referencias Analizadas: ${refs.length}`, 75, doc.y + 15);
+        const verifiedCount = refs.filter(r => r.status === "VERIFIED").length;
+        doc.fillColor(colors.success).text(`Verificadas satisfactoriamente: ${verifiedCount}`, 75, doc.y + 32);
+
+        doc.y += 40;
+        drawSectionTitle("Desglose del Estado de Referencias");
+
+        refs.forEach((r, idx) => {
+          if (doc.y > 700) { doc.addPage(); drawHeader("III. REFERENCIAS (CONTINUACIÓN)"); doc.y = 110; }
+          
+          const statusColors: any = {
+            "VERIFIED": colors.success,
+            "POSSIBLE_HALLUCINATION": colors.critical,
+            "DOI_MISSING": colors.major,
+            "NOT_FOUND": colors.secondary
+          };
+          
+          const sc = statusColors[r.status] || colors.dark;
+          doc.fillColor(sc).font("Helvetica-Bold").fontSize(9).text(`[${r.status}]`, { continued: true });
+          doc.fillColor(colors.dark).font("Helvetica").fontSize(9).text(` ${r.rawText}`);
+          
+          // Nota: El campo suggestion no existe en el esquema, usamos issues si tiene datos.
+          if (r.issues && r.issues.length > 0) {
+            doc.fillColor(colors.secondary).font("Helvetica-Oblique").fontSize(8.5).text(`Observaciones: ${r.issues.join(", ")}`, { indent: 20 });
+          }
+          doc.moveDown(0.5);
         });
       }
 
-      // PAGE 5: DICTAMEN
+      // --- PAGE 5: DICTAMEN FINAL ---
       doc.addPage();
-      drawHeader("DICTAMEN FINAL DEL ASESOR");
+      drawHeader("IV. DICTAMEN FINAL Y OBSERVACIONES");
+
       if (advance.review) {
-        const r = advance.review;
-        const color = r.status === "APPROVED" ? "#059669" : r.status === "REJECTED" ? "#DC2626" : "#D97706";
-        doc.fillColor(color).rect(50, 120, 495, 50).fill();
-        doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(16).text(`ESTADO: ${r.status}`, 50, 137, { align: "center" });
-        doc.y = 200;
-        drawSectionTitle("OBSERVACIONES DEL ASESOR");
-        doc.fillColor(darkColor).font("Helvetica").fontSize(11).text(r.humanComment || "Sin comentarios adicionales.", { align: "justify" });
-        doc.moveDown(4);
+        const rev = advance.review;
+        const statusConfig: any = {
+          "APPROVED": { label: "APROBADO", color: colors.success },
+          "REJECTED": { label: "RECHAZADO", color: colors.critical },
+          "OBSERVED": { label: "CON OBSERVACIONES", color: colors.major }
+        };
+        const cfg = statusConfig[rev.status] || { label: rev.status, color: colors.secondary };
+
+        doc.fillColor(cfg.color).rect(50, doc.y, 495, 60).fill();
+        doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(18).text(`ESTADO FINAL: ${cfg.label}`, 50, doc.y + 22, { align: "center" });
+
+        doc.y += 90;
+        drawSectionTitle("Comentarios del Asesor / Revisor");
+        
+        doc.fillColor(colors.dark).font("Helvetica").fontSize(12).text(rev.humanComment || "El revisor no ha ingresado comentarios detallados todavía.", { align: "justify", lineGap: 4 });
+
+        doc.moveDown(5);
         const sigY = doc.y;
-        doc.strokeColor(secondaryColor).lineWidth(1).moveTo(180, sigY).lineTo(370, sigY).stroke();
-        doc.fillColor(darkColor).font("Helvetica-Bold").fontSize(10).text(r.reviewer.name, 50, sigY + 10, { align: "center" });
-        doc.fillColor(secondaryColor).font("Helvetica").fontSize(9).text("Asesor / Docente Revisor", 50, sigY + 25, { align: "center" });
+        doc.strokeColor(colors.secondary).lineWidth(1).moveTo(180, sigY).lineTo(370, sigY).stroke();
+        doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(11).text(rev.reviewer.name, 50, sigY + 12, { align: "center" });
+        doc.fillColor(colors.secondary).font("Helvetica").fontSize(10).text("Asesor Académico / Docente Revisor", 50, sigY + 28, { align: "center" });
       } else {
-        doc.fillColor(secondaryColor).font("Helvetica-Oblique").fontSize(12).text("Pendiente de revisión por el asesor académico.", { align: "center" });
+        doc.fillColor(colors.secondary).font("Helvetica-Oblique").fontSize(13).text("Este documento se encuentra en espera de la validación final por parte del asesor académico asignado.", { align: "center", width: 400 });
       }
 
-      drawFooter();
+      // PIE DE PÁGINA FINAL (Para todas las páginas)
+      const range = doc.bufferedPageRange();
+      for (let i = 0; i < range.count; i++) {
+        doc.switchToPage(i);
+        // Usamos una posición segura para evitar saltos de página accidentales
+        doc.fillColor(colors.secondary).fontSize(8).font("Helvetica")
+           .text(`Documento generado por ThesisReview Hub · Página ${i + 1} de ${range.count}`, 50, 800, { 
+             align: "center",
+             lineBreak: false 
+           });
+      }
+
       doc.end();
     });
   }
