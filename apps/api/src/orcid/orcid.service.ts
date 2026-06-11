@@ -20,11 +20,12 @@ export class OrcidService {
 
   // Paso 1: Generar URL de autorización OAuth ORCID
   getAuthorizationUrl(userId: string): string {
+    this.logger.log(`Generando URL ORCID con redirect_uri: ${process.env.ORCID_REDIRECT_URI}`);
     const state = crypto.randomBytes(16).toString('hex');
     const params = new URLSearchParams({
       client_id: process.env.ORCID_CLIENT_ID!,
       response_type: 'code',
-      scope: '/authenticate /read-limited',
+      scope: '/authenticate',
       redirect_uri: process.env.ORCID_REDIRECT_URI || `${process.env.API_PUBLIC_URL}/orcid/callback`,
       state: `${userId}:${state}`,
     });
